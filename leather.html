@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leather and Related Products: Small Sector, Sharpening Structure — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .block-note-wide{font-size:17px;line-height:1.68;opacity:.78;margin:0 0 18px;max-width:1040px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Leather and Related Products Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Leather and Related Products",
+    tagline: "India's smallest of the eleven sectors covered here by output, but one of the few showing rising value-added intensity, a shrinking top-firm concentration, and a healthy, widening trade surplus, even as the official output index has structurally lagged the rest of manufacturing.",
+    stats: [
+      {n:"4,928", l:"factories (2023-24)"},
+      {n:"₹73,631 cr", l:"gross value of output, ASI"},
+      {n:"₹33,792 cr", l:"trade surplus, FY24-25"},
+      {n:"10 / 11", l:"IIP level rank"},
+      {n:"−4.1%", l:"latest IIP growth, 2025-26"},
+      {n:"29.5%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "A small, footwear-and-accessories-led sector, rapidly de-concentrating",
+    subhead: "Leather and Related Products (NIC Division 15: tanning and dressing of leather, luggage, handbags, footwear) is the smallest sector by output covered in this series. Factory count and output have both grown steadily, and the market has moved from Highly Concentrated to Competitive in under a decade as newer footwear and accessories brands have scaled up.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, national totals, NIC Div 15, 2023-24.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","4,928"],
+        ["Factories in operation","4,008"],
+        ["Total persons engaged","4.30 lakh"],
+        ["Gross Value of Output, 2023-24","₹73,631 crore"],
+        ["Gross Value Added, 2023-24","₹17,510 crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [0.510,0.602,0.576,0.553,0.611,0.669,0.533,0.685,0.767,0.736],
+      lineValues: [17.9,18.0,20.0,22.1,22.9,20.3,21.8,21.3,21.9,23.8],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO rose 44% over the decade (₹51,000 crore to ₹73,600 crore, 2014-15 to 2023-24, ASI national totals), with a dip in the COVID year (2020-21) and choppy rather than steady growth either side of it. Unlike several other sectors in this series, the value-added share of that output actually rose, from 17.9% in 2014-15 to 23.8% in 2023-24 — the sector is capturing a growing, not shrinking, share of the value in what it produces."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI, NIC Div 15)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [4341,4509,4544,4617,4768,4857,4859,4749,4929,4928]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","21-22","22-23","23-24","24-25"],
+      values: [333.5,366.5,405.3,418.7,474.8,515.3,507.8,508.6,553.5,544.4],
+      band: "Competitive band is HHI < 1,500 — Leather sits well inside it throughout on this full-universe basis, in contrast to the previous top-20-panel measure shown on this page (which ran 2,757 → 1,041 and crossed from 'Highly Concentrated' into 'Competitive'). This series is computed from every firm reporting positive revenue each year (97 firms in 2014-15, falling to 79 in 2024-25), not a fixed top-20 panel, so it is not directly comparable to that narrower methodology. On this basis, concentration has actually drifted mildly upward, not down: HHI rose from 333.5 (2014-15) to 544.4 (2024-25) and top-3 share from 22.0% to 29.5% over the same period, even as the number of firms reporting usable revenue fell from 97 to 79 — a modest concentration uptick as the reporting population thins, the opposite direction from the steep de-concentration the fixed-panel measure implied. The 2020-21 data point is excluded from this chart: the source pull's total sector revenue for that year (₹9,05,604 million, implying HHI 6,986.3 and 87.8% top-3 share) is roughly 5x the surrounding years and directly contradicts external industry data (Council for Leather Exports / DGCI&S figures show India's leather and footwear exports fell 27.4% in 2020-21 due to COVID), consistent with a source data error rather than a genuine one-year concentration spike."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (aggregate, all companies)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","21-22","22-23","23-24","24-25"],
+      values: [0.322,0.375,0.403,0.405,0.383,0.432,0.457,0.460,0.480,0.483],
+      band: "Moderate band is 0.5×-1.5× — the sector sits just under the Moderate threshold throughout, drifting up gradually from 0.32× to 0.48× over the decade. The source workbook's 2020-21 Gross Fixed Assets figure (₹38,11,030 million) is a clear data-entry outlier against neighbouring years (~₹74,000-87,000 million) and is excluded from this chart rather than plotted as-is."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      valueSuffix: "%",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [39.16,13.07,1.89,45.88],
+      caption: "Raw material cost fell from 49.76% of sales in 2014-15 to 39.16% in 2024-25, while employee cost rose from 8.19% to 13.07% over the same period — a labour-intensifying, not raw-material-intensifying, cost structure shift. The residual 'Other / margin' band (45.88%) includes royalties and technical fees (0.38% of sales), overheads, financing costs and PAT margin (3.45% of total income in 2024-25)."
+    },
+    firmTable: {
+      note: "Leading firms by 2024-25 revenue (single-year basis, superseding the previous 3-year-average presentation). Source: Prowess IQ, 2026 pull, leather_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. Export Intensity and R&D % of Sales are reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["Relaxo Footwears Ltd.","Footwear (mass-market)","2,790","6.1%","—","—"],
+        ["Walkaroo International Pvt. Ltd.","Footwear (mass-market)","2,112","5.8%","0.02%","—"],
+        ["Redtape Ltd.","Footwear & lifestyle accessories","2,018","9.1%","—","—"],
+        ["Paragon Polymer Products Pvt. Ltd.","Footwear (mass-market, polymer/rubber)","1,643","2.2%","—","—"],
+        ["Campus Activewear Ltd.","Footwear (sports/athleisure)","1,593","7.6%","0.58%","—"]
+      ]
+    },
+    firmConcNote: "Concentration on the full-universe basis tells a different story from the old top-20-panel measure above. Computed from the full firm universe reporting revenue each year, sector HHI stood at 544.4 in 2024-25, up from 333.5 in 2014-15 — comfortably inside the 'Competitive' band throughout, but a mild rise, not the steep fall (2,757 → 1,041) the previous fixed-panel figure showed. The top-3 firms' combined share on this same full-universe basis was 29.5% in 2024-25, up from 22.0% in 2014-15, while the number of reporting firms fell from 97 to 79 over the same period — a thinning reporting base alongside modestly rising concentration, rather than the newer-brands-driven de-concentration story told previously. Export and R&D fields are blank at source for most of the top 5 by revenue; the firms that actually lead the sector on R&D and export value and intensity are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, leather_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["Campus Activewear Ltd.","9.23"],
+        ["Rahman Industries Ltd.","1.11"],
+        ["Superhouse Ltd.","1.11"],
+        ["Liberty Shoes Ltd.","0.65"],
+        ["Walkaroo International Pvt. Ltd.","0.38"]
+      ]
+    },
+    rndByValueNote: "Campus Activewear leads by a wide margin in absolute spend (₹9.2 crore) and is also the top-ranked firm on the intensity list below, though even its 0.58% intensity sits in the Institute's 'Laggard' band (<1%). Four of the five firms here, Campus Activewear, Rahman Industries, Superhouse and Liberty Shoes, also appear on the by-intensity list below; only Walkaroo International appears solely on this by-value list.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25. Source: Prowess IQ, 2026 pull, leather_rnd_leaders.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Campus Activewear Ltd.","9.23","1,592.96","0.58%"],
+        ["Sarup Industries Ltd.","0.08","15.97","0.50%"],
+        ["Superhouse Ltd.","1.11","479.70","0.23%"],
+        ["Rahman Industries Ltd.","1.11","523.24","0.21%"],
+        ["Liberty Shoes Ltd.","0.65","675.48","0.10%"]
+      ]
+    },
+    rndLeadersNote: "All five R&D intensity leaders sit below 1% of sales, squarely in the Institute's 'Laggard' band (<1%) with none reaching even 'Active' (1-3%) — R&D intensity is structurally low across the sector's leading firms, not just at the largest ones. Four of the five, Campus Activewear, Superhouse, Rahman Industries and Liberty Shoes, also appear on the by-value list above; only Sarup Industries, a much smaller firm by revenue (₹16 crore), appears solely on this intensity list.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, leather_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Apache Footwear India Pvt. Ltd.","1,450.80"],
+        ["A V Thomas Leather & Allied Products Pvt. Ltd.","406.37"],
+        ["Superhouse Ltd.","328.94"],
+        ["Rama Overseas Ltd.","265.52"],
+        ["Super Tannery Ltd.","231.30"]
+      ]
+    },
+    exportByValueNote: "Apache Footwear India leads by a wide margin (₹1,451 crore, more than 3.5x the second-place firm) and also tops the export-intensity ranking below at 98.4% — a firm that is both the largest exporter and among the most export-dependent, not just the largest in a diversified business. Rama Overseas is the only other firm to appear on both the by-value and by-intensity lists; Superhouse appears here but not on the intensity list, reflecting a lower export share of its total sales.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25. Source: Prowess IQ, 2026 pull, leather_export_leaders.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Davinci Leather Pvt. Ltd.","35.98","36.37","98.9%"],
+        ["Apache Footwear India Pvt. Ltd.","1,450.80","1,474.00","98.4%"],
+        ["Althaf Shoes Pvt. Ltd.","164.10","172.14","95.3%"],
+        ["Trio Trend Exports Pvt. Ltd.","113.05","118.62","95.3%"],
+        ["Rama Overseas Ltd.","265.52","288.46","92.1%"]
+      ]
+    },
+    exportLeadersNote: "Apache Footwear India and Rama Overseas are the only two firms to appear on both the by-value and by-intensity export lists — both large exporters in absolute terms that also export nearly all of what they sell. The other three intensity leaders (Davinci Leather, Althaf Shoes, Trio Trend Exports) are smaller, near-fully export-oriented specialty firms that don't rank among the sector's top absolute exporters.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 110 firms reporting in the sector in 2014-15, 22 have stopped reporting entirely and a further 7 are dormant (reporting but with negligible or zero activity), leaving 81 still active. Combined churn (stopped-reporting plus dormant) is 29 firms, or 26.4% of the original 2014-15 universe. This 110-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year), which is why the two firm counts for FY2014-15 differ slightly (110 vs 97)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "The IIP's second-weakest performer, despite improving firm financials",
+    subhead: "Leather and Related Products appears in India's IIP series under the 'Consumer Goods' label, which in this workbook maps 1:1 to NIC Division 15 (Leather) alone, no other sub-sector is folded in. By that measure it is a structural laggard: 10th of 11 sectors on index level, latest growth, and full-period CAGR alike, even as firm-level financial ratios have moved in a healthier direction.",
+    iipChart: {
+      title: "IIP index, Leather ('Consumer Goods' label), 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [110.6,113.0,123.0,123.6,122.3,123.9,125.0,122.7,100.6,101.9,96.0,95.0,91.7,87.9],
+      annotations: [
+        {index:6, label:"peak 125.0", color:"var(--thread-turmeric)"},
+        {index:8, label:"100.6 (COVID)", color:"var(--thread-madder)"},
+        {index:13, label:"87.9 (latest, below COVID trough)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[3.23,3.43,2.73,3.45]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[10.06,8.14,7.23,6.54]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Leather — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2023-24"],
+      rows: [
+        ["Workers per factory","64.2","68.2","66.1"],
+        ["Wages per worker (₹)","97,557","1,53,346","1,93,748"],
+        ["Output per worker (₹)","18,29,215","21,14,760","22,59,717"],
+        ["Productivity–wage ratio","1.99","2.45","2.31"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","3.2%","3.4%"],
+        ["ROE %","10.1%","6.5%"],
+        ["ROCE %","13.7%","10.9%"],
+        ["Debt-to-Equity (×)","0.95","0.50"],
+        ["Interest Cover (×)","2.74","3.43"],
+        ["Current Ratio","1.18","1.41"],
+        ["Free Cash Flow (₹ mn)","974.1","2,974.4"]
+      ]
+    },
+    fcfNote: "Free Cash Flow is volatile rather than steadily improving: it turned negative in 2017-18 (−₹3,127.4 million) and again in 2021-22 (−₹1,760.2 million), and its single best year in the decade (₹7,849 million, 2020-21) was the COVID year itself, when fixed-asset purchases fell sharply rather than operating cash flow rising.",
+    rndFlag: "R&D spend has stayed under 0.06% of sales throughout the decade, a clear 'laggard' by the Institute's thresholds (Leader >3%, Active 1-3%, Laggard <1%) and among the lowest R&D intensities of any sector in this series. The 2024-25 figure (0.053%) is a step up from 2023-24 (0.007%) driven by a single year's R&D spend rising more than seven-fold (₹16.3 million to ₹126.4 million); this reads as a one-off jump rather than an established trend, and is flagged as such.",
+    narrative: "Leather tracked close to, and briefly above, the pre-COVID trend through the mid-2010s, peaking at 125.0 in 2018-19, before falling into a slow, sustained decline that COVID accelerated rather than caused: the index was already down to 122.7 by 2019-20, before the COVID year itself, then fell further to 100.6 in 2020-21. Unlike most other sectors in this series, the index never meaningfully recovered, it has fallen in four of the five years since COVID, reaching 87.9 by 2025-26, below even the COVID-year trough. On the Institute's own ranking, the sector is 10th of 11 on index level, 10th on latest-year growth (−4.1%), and 10th on full-period CAGR (−1.75%, the only negative full-period CAGR in this series besides General Manufacturing), while ranking a moderate 8th of 11 on volatility, meaning its underperformance is persistent rather than erratic. This sits in real tension with the firm-level and structural data in the rest of this paper: value-added share of output is rising, concentration is falling as new entrants scale, and the trade balance is a healthy, growing surplus. The IIP weakness appears to be an output-volume story specifically, not a story of firms in distress or a shrinking industrial base."
+  },
+
+  investment: {
+    eyebrow: "03 — Investment & PLI",
+    title: "A small, mostly private pipeline, and no dedicated PLI scheme",
+    subhead: "Investment in Leather is modest in absolute terms next to the other sectors in this series and dominated by Indian private capital. Unlike Textiles, Electronics, Chemicals (pharma slice) and Transport Equipment, Leather and footwear is not one of the Government of India's 14 officially designated Production Linked Incentive sectors, and the source data reflects that.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[90,11939.5,3775]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[59,750,2547.9]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE Industry Outlook CapEx database. Figures converted from source Rs. million to Rs. crore.",
+      cols:["Indicator","Value"],
+      rows:[
+        ["Total investment outstanding","₹19,446 cr (31 projects)"],
+        ["Under implementation","₹7,908 cr (18 projects)"],
+        ["Implementation stalled","₹350 cr (1 project)"],
+        ["Investments completed","not filled at source for 2024-25; ₹400 cr (1 project) in 2023-24"],
+        ["New investments announced","₹3,775 cr (6 projects), up from ₹3,000 cr (3 projects) in 2023-24"]
+      ]
+    },
+    dropFlag:"The 2022-23 spike in new investment (₹11,940 crore against ₹1,222 crore the year before and ₹3,775 crore in 2024-25) is driven by a small number of large projects rather than a broad-based surge, consistent with a sector where a single large plant can dominate a year's national total. Dropped-investment cost rose sharply in the same 2024-25 year (₹2,548 crore, roughly 3.4× the 2023-24 figure), worth watching alongside the small pipeline base.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore). Ranked by the sector's actual GVO order (Tamil Nadu, Uttar Pradesh, Haryana).",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Tamil Nadu","354","12,432","17,110"],
+        ["Uttar Pradesh","1,492","1,150","1,150"],
+        ["Haryana","425","not filled at source","25"]
+      ]
+    },
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[0,0,1775,2000]
+    },
+    ownershipNote:"Indian Private Sector (₹1,775 crore) and Foreign Private (₹2,000 crore) together account for the full ₹3,775 crore of new investment in 2024-25; the source workbook shows no Central or State Government new-investment entry for this specific year (both rows are blank rather than zero, and are treated as zero for the purposes of this chart). The four ownership-group figures sum exactly to the sector-wide new-investment total reported separately, a useful internal consistency check.",
+    pliNote:"Leather and footwear is not one of the Government of India's 14 officially designated Production Linked Incentive sectors (which cover electronics, pharmaceuticals, automobiles and auto components, textiles for man-made fibres, telecom, white goods, solar PV modules, advanced chemistry cell batteries, drones, specialty steel, food processing, IT hardware, and a few others). Consistent with that, the CMIE Industry Outlook 'PLI Scheme Expenditure' rows for this sector are entirely blank at source. A separate CMIE PLI report the person supplied directly shows a Budget Estimate of ₹0.1 million (₹10 lakh) for 2024-25 and again for 2026-27, with 2025-26 blank, figures small enough to read as a rounding or administrative-line entry rather than a substantive scheme allocation. Investment in this sector, in other words, is a private-capital story with essentially no PLI policy layer, unlike most other sectors covered in this series.",
+    fdiNote:"No sector-specific cumulative FDI figure for Leather and Related Products (NIC Division 15) was available in the sources reviewed for this paper. This is flagged as a data gap rather than estimated.",
+    rndHighlight: { pct: "0.053%", label: "R&D spend as share of sales, 2024-25 — among the lowest of any sector in this series", band: "Laggard (<1%)", note: "There is no PLI disbursement of any real scale to compare this against. R&D spend across the tracked aggregate-basis firms has stayed under 0.06% of sales in every year of the decade; the small 2024-25 uptick is driven by one year's spend more than septupling and is flagged as a possible one-off rather than a structural shift." },
+    insightBox:"Leather's investment story reads differently from most other sectors in this series: there is no PLI scheme to weigh against R&D spend or production subsidies, so investment here is close to a pure private-capital signal. The pipeline is genuinely small in absolute terms (₹19,446 crore outstanding, against ₹87,372 crore for Textiles and far larger figures for Electronics and Chemicals), consistent with the sector's overall scale, but the underlying direction, rising new investment, falling concentration, rising value-added share, is more constructive than the IIP's output-index trend alone would suggest."
+  },
+
+  trade: {
+    eyebrow: "04 — Trade",
+    title: "A healthy and widening trade surplus",
+    subhead: "Leather runs a comfortable and growing trade surplus, exports have grown in every year since the COVID trough and comfortably outpace a small, roughly flat import base. Import dependency, at 22.1%, is moderate relative to other sectors in this series.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[39542,30180,41051,48252,44593,47172,48653]},
+        {name:"Imports", color:"var(--thread-madder)", values:[12227,6687,10345,14887,13361,13380,13549]}
+      ]
+    },
+    stats:[
+      {n:"5.8%", l:"export growth, FY24-25"},
+      {n:"0.1%", l:"import growth, FY24-25 — essentially flat"},
+      {n:"22.1%", l:"import dependency"},
+      {n:"3.6%", l:"export 5-year CAGR"},
+      {n:"1.8%", l:"import 5-year CAGR"}
+    ],
+    tradeBalanceNote: "The trade surplus stood at ₹33,792 crore in FY24-25 (exports ₹47,172 crore against imports ₹13,380 crore), and has held in a broadly similar ₹27,000-38,000 crore range every year since the COVID-year trough (2020-21: ₹23,493 crore), a steadier trade picture than the IIP's output-index trend on its own would suggest.",
+    caveatNote: "Figures in this section are directional rather than exact — the underlying HS-to-NIC concordance maps a majority but not all of trade value to a sector; the remainder is unclassified and excluded rather than estimated. Sector-specific partner-country breakdowns (which countries India trades leather goods with, beyond the all-sector totals) were not available in the trade data files reviewed for this paper and are flagged as a data gap rather than estimated or substituted with all-sector figures.",
+    productsTable:{
+      note: "Top-5 traded products by value, FY24-25. HS-code level.",
+      cols:["#","Export product (₹ cr)","Import product (₹ cr)"],
+      rows:[
+        [1,"Other ankle-covered footwear — 5,687","Other footwear, rubber/plastic soles, textile upper — 1,914"],
+        [2,"Handbags, plastic/textile sheeting outer surface — 4,582","Trunks, suitcases, similar containers, plastic/textile outer — 1,528"],
+        [3,"Handbags, leather/composition/patent leather outer — 3,539","Handbags, plastic/textile sheeting outer surface — 1,222"],
+        [4,"Other footwear, other-material outer soles — 3,099","Other gaiters, leggings and similar articles, and parts — 917"],
+        [5,"Articles of apparel (leather/composition) — 2,989","Other footwear of HS 6402 — 868"]
+      ]
+    },
+    firmTable:{
+      note:"Firms with usable export-intensity data from the Consumer Goods firm-level workbook, 3-yr average (FY22-23 to FY24-25). Most tracked firms report 0% or unfilled export intensity, consistent with a sector where the largest tracked firms by sales sell predominantly domestically.",
+      cols:["Firm","Export % of sales (3-yr avg)","Imported RM % of total RM","PAT margin %"],
+      rows:[
+        ["Apache Footwear India Pvt. Ltd.","99.7%","not filled at source","−3.2%"],
+        ["Liberty Shoes Ltd.","4.8%","6.0%","1.8%"],
+        ["Relaxo Footwears Ltd.","0.0%","0.0%","6.0%"],
+        ["Paragon Polymer Products Pvt. Ltd.","0.0%","0.0%","−0.1%"]
+      ]
+    },
+    firmTradeNote: "Apache Footwear India, a contract manufacturer, is the clear outlier: essentially the entirety of its sales are exports, while every other firm with usable data in this table sells almost entirely into the domestic market. This bimodal pattern, one large export-oriented contract manufacturer alongside several domestically-focused brands, is a different trade structure from sectors where mid-sized firms sit at intermediate export shares."
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Tamil Nadu and Uttar Pradesh together account for half of national output",
+    subhead: "Tamil Nadu leads by a wide margin on both output and factory count, followed by Uttar Pradesh; Haryana is a smaller but higher-output-per-factory third. Wages per worker vary widely across the top-5 states, with Karnataka and Delhi paying the most despite comparatively small factory counts.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Tamil Nadu","Uttar Pradesh","Haryana","West Bengal","Karnataka"],
+      values:[18542,17686,11375,7250,4063]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5",
+      xLabel:"State", yLabel:"% of national GVO",
+      valueSuffix: "%",
+      labels:["Tamil Nadu","Uttar Pradesh","Haryana","West Bengal","Karnataka"],
+      values:[25.19,24.02,15.45,9.85,5.52]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Tamil Nadu","Uttar Pradesh","Haryana","West Bengal","Karnataka"],
+      values:[168774,161664,166743,178153,249979]
+    },
+    stateTable:{
+      note:"Top-5 states by GVO share, ASI 2023-24 (latest available)",
+      cols:["State","Factories","GVO share","Persons engaged share","Wages/worker"],
+      rows:[
+        ["Tamil Nadu","1,442","25.2%","33.4%","₹1,68,774"],
+        ["Uttar Pradesh","1,156","24.0%","22.9%","₹1,61,664"],
+        ["Haryana","447","15.5%","13.4%","₹1,66,743"],
+        ["West Bengal","675","9.9%","9.5%","₹1,78,153"],
+        ["Karnataka","189","5.5%","3.2%","₹2,49,979"]
+      ]
+    },
+    flag:"Top-5 states account for ~80% of national GVO, a tighter geographic concentration than most sectors in this series, though spread across a genuinely different regional pattern than Textiles or Transport Equipment: Tamil Nadu and Uttar Pradesh together contribute roughly half of national output. Karnataka stands out for pairing the highest wages per worker among the top five (₹2,49,979) with the smallest factory count and GVO share, similar in kind to Karnataka's pattern in the Transport Equipment paper, consistent with a smaller number of higher-value operations rather than high-volume, high-employment manufacturing. Odisha, Jharkhand and Assam report zero or near-zero factories and GVO in this sector at source, and Goa's wage figure is a division-by-zero artifact (zero factories, zero output) rather than a real data point."
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Zero clusters registered at source, a genuine data gap",
+    subhead: "Unlike every other sector covered so far in this series, the Cluster Supply Chain Linkage Workbook has no clusters logged for Leather at all. This is a documented gap in the underlying register, not a finding that the sector lacks real clusters.",
+    dataGapNote: "The workbook's own Sector Coverage Tracker confirms this directly: the row for this sector ('Consumer Goods' in the tracker's own labelling) shows 0 clusters in the register, 0 with a firm logged, and 0 with a summary verdict, the same blank state as Construction Materials, Pharmaceuticals and General Manufacturing in the same tracker, and unlike Textiles, Chemicals, Electronics, Metals, Engineering Goods, Electrical Equipment and Transport Equipment, which all have entries. India's leather sector has well-documented real-world clusters, Kanpur and Agra in Uttar Pradesh, Chennai and Ambur/Vaniyambadi in Tamil Nadu, and Kolkata's Bantala/Topsia leather complex in West Bengal are the best-known, and these line up closely with the top-3 GVO states identified in the Geography theme above. But none of them have been entered into this project's cluster register yet, so this paper cannot report unit counts, anchor firms, turnover, or export orientation for any Leather cluster without fabricating figures that are not in the underlying data. This is flagged here as an open item for a future data-collection pass, consistent with the zero-hallucination standard this series follows throughout.",
+    note:"The state-level pattern in the Geography theme above (Tamil Nadu and Uttar Pradesh leading, Haryana and West Bengal following) is consistent with where India's best-known leather and footwear hubs are commonly understood to sit, but that correspondence is drawn from general knowledge of the industry, not from the cluster workbook itself, and should not be read as a substitute for verified cluster-level data."
+  }
+};
+
+
+/* =====================================================================
+   THE SECTOR STORY
+   ===================================================================== */
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "A small sector improving structurally while its output index lags",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Leather and Related Products stands today.",
+  sections: [
+    { h: "The core tension: structural improvement, output-index weakness", p: [
+      "Leather and Related Products is the smallest sector by output in this eleven-sector series, ₹73,631 crore of Gross Value of Output in 2023-24, against ₹7.81 lakh crore for Textiles and far larger figures for Electronics or Chemicals. But scale aside, several structural indicators point in a genuinely positive direction. The value-added share of output rose from 17.9% (2014-15) to 23.8% (2023-24), a rising rather than falling trend, unlike Textiles, Electronics or Chemicals over the same period. Market concentration, measured on a full-firm-universe basis, remains comfortably inside the 'Competitive' band throughout the decade (HHI 333.5 in 2014-15 to 544.4 in 2024-25), though it has drifted mildly upward rather than down, alongside a shrinking reporting base (97 firms in 2014-15 to 79 in 2024-25) — a more modest and less dramatic picture than a narrower top-20-panel measure would suggest.",
+      "Set against that, the IIP tells a genuinely weaker story than almost any other sector reviewed so far. The index (reported under the 'Consumer Goods' label, which in this project's IIP workbook maps 1:1 to NIC Division 15 alone) peaked at 125.0 in 2018-19, was already declining before COVID, fell to 100.6 in the COVID year, and has kept falling in four of the five years since, reaching 87.9 by 2025-26, below its own COVID-year trough. The sector ranks 10th of 11 on index level, latest-year growth and full-period CAGR alike. Firm-level financial ratios have not collapsed alongside this, PAT margin and ROE both remain positive and broadly stable, but the output-volume story the IIP tells is clearly the sector's weakest data point."
+    ]},
+    { h: "Trade: a genuine bright spot", p: [
+      "Unlike the IIP series, trade tells a steady, positive story. Leather ran a trade surplus of ₹33,792 crore in FY24-25 (exports ₹47,172 crore against imports ₹13,380 crore), and that surplus has held in a broadly similar ₹27,000-38,000 crore range in every year since the COVID-year trough. Exports grew 5.8% year-on-year in FY24-25 against essentially flat imports (0.1% growth), and import dependency, at 22.1%, sits well below several other sectors in this series. Footwear (ankle-covered footwear, other rubber/plastic-soled footwear) and leather goods (handbags, apparel) dominate both the export and import product lists, with the specific top products differing meaningfully between the two directions. One notable gap: sector-specific partner-country data (which countries India trades leather goods with) was not available in the trade files reviewed for this paper, unlike the detailed partner tables possible for other sectors in this series, and is flagged rather than estimated."
+    ]},
+    { h: "Investment: private-led, and genuinely PLI-free", p: [
+      "Investment in Leather is small in absolute terms, ₹19,446 crore outstanding across 31 projects, against ₹87,372 crore for Textiles, but is entirely funded by Indian and foreign private capital; the 2024-25 ownership breakdown shows zero Central or State Government new investment. A distinguishing feature of this sector, not shared by Textiles, Electronics, Chemicals' pharmaceuticals slice, or Transport Equipment, all covered earlier in this series, is that Leather and footwear is not one of the Government of India's 14 officially designated Production Linked Incentive sectors. The CMIE Industry Outlook workbook's PLI rows for this sector are entirely blank, and a supplementary CMIE PLI report shows only a token ₹0.1 million (₹10 lakh) Budget Estimate line for 2024-25 and 2026-27, an administrative-scale figure rather than a substantive scheme allocation. Investment here, in other words, is close to a pure private-capital signal, unclouded by a policy incentive layer that shapes the investment story in most of the other sectors reviewed."
+    ]},
+    { h: "Geography: Tamil Nadu and Uttar Pradesh together account for half the sector", p: [
+      "Tamil Nadu (25.2% of national GVO) and Uttar Pradesh (24.0%) together account for roughly half of national output, with Haryana (15.5%), West Bengal (9.9%) and Karnataka (5.5%) rounding out a top-5 that covers about 80% of national GVO, a tighter geographic concentration than most sectors in this series. Karnataka is the notable outlier on wages, the highest wages per worker among the top-5 states (₹2,49,979) despite having the smallest factory count and GVO share among them, a pattern that echoes Karnataka's role in the Transport Equipment paper: fewer, higher-value operations rather than high-volume, high-employment manufacturing."
+    ]},
+    { h: "Clusters: a genuine, documented data gap", p: [
+      "Unlike every other sector covered in this series, the Cluster Supply Chain Linkage Workbook has zero clusters logged for Leather, confirmed directly by the workbook's own Sector Coverage Tracker. This is a gap in the underlying register, not a finding about the sector itself; India's leather industry has well-known real-world clusters (Kanpur and Agra in Uttar Pradesh, Chennai and Ambur/Vaniyambadi in Tamil Nadu, Kolkata's Bantala/Topsia complex in West Bengal) that line up closely with the top-3 GVO states identified above. But without verified entries in the project's own register, this paper cannot report cluster-level unit counts, anchor firms, or export orientation without fabricating figures that are not in the underlying data, and this is flagged as an open item for a future data-collection pass rather than filled in from general knowledge."
+    ]},
+    { h: "R&D: a laggard, even by the standards of this series", p: [
+      "R&D spend as a share of sales stayed under 0.06% throughout the decade, among the lowest R&D intensities of any sector in this series, and squarely in the 'laggard' band (below 1%) by the Institute's own thresholds. The small uptick to 0.053% in 2024-25 is driven by a single year's R&D spend rising more than seven-fold from a very low base and reads as a possible one-off rather than an established trend. Unlike Textiles or Electronics, there is no PLI disbursement of comparable scale to weigh against this R&D figure, since no PLI scheme exists for this sector; the comparison itself is simply not available here."
+    ]}
+  ],
+  summary: [
+    {n:"+44%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"17.9%→23.8%", l:"GVA share of GVO, 2014-15 → 2023-24 — rising"},
+    {n:"333.5→544.4", l:"HHI, 2014-15 → 2024-25 (full firm universe)"},
+    {n:"₹33,792 cr", l:"trade surplus, FY24-25"},
+    {n:"10 / 11", l:"IIP rank on level, growth and CAGR alike"}
+  ],
+  takeaway: "Leather and Related Products is the smallest sector in this series by output, and its official output index is among the weakest, tenth of eleven on level, growth and CAGR, having fallen below its own COVID-year trough by 2025-26. But nearly every other structural indicator points the other way: value-added share of output is rising, market concentration is falling fast as new entrants scale, and the sector runs a healthy, steady trade surplus with genuinely low import dependency. It is also structurally distinct from every other sector reviewed in this series so far in having no Production Linked Incentive scheme at all, making its investment pipeline a comparatively unclouded private-capital signal, and in having zero verified clusters in the project's own register despite well-known real-world hubs in Tamil Nadu, Uttar Pradesh and West Bengal, a data gap worth closing before the next pass of this paper.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, NIC Division 15, 2014-15 to 2023-24.",
+    "Index of Industrial Production, corrected 11-sector composite, Ministry of Statistics and Programme Implementation. The 'Consumer Goods' label in this workbook maps 1:1 to NIC Division 15 (Leather and Related Products), weight 0.5021, no other sub-sector is folded in.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, firm-level panel, 'Consumer Goods' sector tab (NIC 15).",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates and CapEx Investment Pipeline database, 'Leather and Related Products' sheet, FY14-15 to FY24-25.",
+    "Centre for Monitoring Indian Economy, Central Government Expenditure on Production Linked Incentive (PLI) Scheme, Leather and Related Products, Budget Estimates, FY24-25 to FY26-27.",
+    "Cluster Supply Chain Linkage Workbook, Sector Coverage Tracker (no clusters registered for this sector at time of writing)."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to a small documented residual against the official total; this does not affect this sector's own index level or growth figures."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures excludes unclassified trade value rather than estimating it; treat trade figures as directional rather than exact. Sector-specific partner-country data was not available in the sources reviewed and is flagged as a gap."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"The source workbook's 2020-21 Gross Fixed Assets figure (aggregate, all companies) is a clear data-entry outlier against neighbouring years and is excluded from the Capital Intensity chart rather than plotted as-is."},
+    {tag:"(e)", text:"Redtape Ltd. and Campus Activewear Ltd. had no 'Sales of Goods' figure filled at source in the firm-level workbook; Revenue from Operations is used in its place for these two firms only in the Scale theme's firm table."},
+    {tag:"(f)", text:"Leather and footwear is not one of the Government of India's 14 officially designated PLI sectors. The small Budget Estimate figure cited in the Investment theme (₹0.1 million for 2024-25 and 2026-27) is sourced from a supplementary CMIE PLI report rather than the main Industry Outlook workbook, whose PLI rows for this sector are blank."},
+    {tag:"(g)", text:"The Cluster Supply Chain Linkage Workbook has zero clusters registered for this sector, confirmed by its own Sector Coverage Tracker. This paper does not supply cluster-level figures from general knowledge in place of verified register data."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · NIC Division 15 · Primary Research: To be asked · Compiled by: Riddhi Bhargava"
+};
+
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+/* Value labels on bars/points must stay compact but exact-ish; short-form
+   for big absolute figures, one-decimal for anything under 1000. */
+function fmtVal(v){
+  if(Math.abs(v)>=1000) return fmtShort(v);
+  if(Number.isInteger(v)) return v.toString();
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  const multi = series.length>1;
+  series.forEach((ser,si)=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`;
+      const above = multi ? (si%2===0) : true;
+      const ly = above ? y-12 : y+20;
+      s+=`<text class="value-label" x="${x}" y="${ly}" text-anchor="middle" fill="${ser.color}">${fmtVal(v)}</text>`;
+    });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<text class="bar-value-label" x="${cx}" y="${y-10}" text-anchor="middle">${fmtVal(v)}${cfg.valueSuffix||''}</text>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <p class="cc-eyebrow">Leather and Related Products Sector Snapshot</p>
+      <h1 class="cc-title">${c.title}</h1>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">0.053%</div><div class="rnd-label">of sales — R&D spend, 2024-25</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.stats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <p class="block-note" style="margin-top:18px">${d.tradeBalanceNote}</p></div></div>
+    <div class="grid1">${table(d.productsTable)}</div>
+    <div class="grid1"><p class="block-title">Firm trade profile, ranked</p>${table(d.firmTable)}
+      <p class="block-note" style="margin-top:12px">${d.firmTradeNote}</p></div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="rnd-callout" style="margin-top:8px"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap"><div class="rnd-num">${d.rndHighlight.pct}</div><div><div class="rnd-label">${d.rndHighlight.label}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">${d.rndHighlight.band}</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div></div></div><p class="rnd-note" style="margin-top:14px">${d.rndHighlight.note}</p></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="flag">${d.dataGapNote}</div>
+    <p class="block-note" style="margin-top:18px">${d.note}</p>
+    </div>`;
+}
+
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Leather and Related Products Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>

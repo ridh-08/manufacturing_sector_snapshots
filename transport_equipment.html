@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transport Equipment: Scaling Fast, on Firmer Footing — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .block-note-wide{font-size:17px;line-height:1.68;opacity:.78;margin:0 0 18px;max-width:1040px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Transport Equipment Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Transport Equipment",
+    tagline: "India's fastest-growing large manufacturing sector on the official output index, built on a decade of steadily strengthening firm financials and a private-sector-led investment pipeline.",
+    stats: [
+      {n:"8,869", l:"factories (2023-24)"},
+      {n:"₹16.27 L cr", l:"gross value of output"},
+      {n:"₹65,139 cr", l:"trade surplus, FY24-25"},
+      {n:"157.8", l:"IIP index, 2025-26 (base 2011-12=100)"},
+      {n:"+11.8%", l:"latest IIP growth, 2025-26"},
+      {n:"18.3%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "A decade of steady expansion, output outrunning value added",
+    subhead: "Factory count and output have both grown through the decade. Concentration has drifted up gently but stays in the competitive band, while the value-added share of output has been essentially flat.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, NIC 29 + 30, 2023-24.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","8,869"],
+        ["Factories in operation","7,698"],
+        ["Total persons engaged","17.88 lakh"],
+        ["Gross Value of Output, 2023-24","₹16.27 lakh crore"],
+        ["Gross Value Added, 2023-24","₹2.97 lakh crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [6.17,6.83,7.23,8.19,9.37,8.63,8.45,11.10,14.25,16.27],
+      lineValues: [18.5,19.6,19.1,17.5,18.6,18.5,17.8,16.7,16.5,18.3],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO more than doubled over the decade, rising from ₹6.17 lakh crore to ₹16.27 lakh crore, a 163.5% increase, with the sharpest jumps in 2021-22 and 2022-23. Value-added intensity has moved narrowly between 16.5% and 19.6% with no clear trend, closing the decade at 18.3% against 18.5% at the start. Unlike sectors where growth comes with rising value capture, Transport Equipment is producing more without a structural shift in how much of that output stays in the sector as value added."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI, NIC 29+30)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [8178,8087,8215,8489,8585,8823,8671,9029,8681,8869]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [213.5,245.5,242.3,229.4,221.2,201.9,183.4,173.2,186.3,199.4,208.4],
+      band: "Competitive band is HHI < 1,500 — Transport Equipment is extremely competitive on this basis throughout. This HHI is computed directly from every firm reporting positive Revenue From Operations in the sector's Prowess export each year (982 to 1,093 firms depending on the year, not a fixed top-20 panel), so it reads much lower than a top-firm-sample HHI would and is not comparable to that narrower methodology used previously on this page. Top-3 firm share on this same full-universe basis was 18.7% in 2014-15, dipped to a low of 16.1% in 2021-22, and stood at 18.3% in 2024-25 — essentially flat over the decade rather than climbing. The number of firms reporting usable revenue fell from 1,092 (2017-18, the peak) to 982 (2024-25), a one-year drop worth reading alongside the churn figures below."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (national aggregate)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [0.516,0.470,0.445,0.441,0.447,0.585,0.821,0.520,0.425,0.415,0.452],
+      band: "Moderate band is 0.5×–1.5× — Transport Equipment sits at the light end of moderate for most of the decade, only crossing clearly into the moderate band during 2019-20 to 2021-22 when COVID suppressed the sales denominator faster than fixed assets could be shed."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      valueSuffix: "%",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [60.95,6.05,1.30,31.70],
+      caption: "Power & fuel (1.30%, the lowest of the four components) shown separately from the residual 'Other / margin' band (31.70%), which includes royalty & technical know-how fees (1.22% of sales), overheads, and PAT margin (7.21% of sales in 2024-25)."
+    },
+    firmTable: {
+      note: "Leading firms by 2024-25 revenue (single-year basis, superseding the previous 3-year-average presentation). Source: Prowess IQ, 2026 pull, transport_equipment_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. Export Intensity and R&D % of Sales are reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero. Note: the source data separately carries a 'Tata Motors Passenger Vehicles Ltd. [Merged]' entity (2024-25 revenue ₹48,969 cr, ranked 7th, outside this top 5), reflecting the 2024 demerger of Tata Motors' passenger-vehicle business into a standalone legal entity; the row below is the continuing, non-merged entity.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["Maruti Suzuki India Ltd.","Passenger vehicles","1,51,900","9.4%","0.14%","—"],
+        ["Mahindra & Mahindra Ltd.","Passenger & commercial vehicles, tractors","1,18,625","10.0%","0.82%","—"],
+        ["Tata Motors Passenger Vehicles Ltd.","Passenger vehicles","69,419","8.5%","—","—"],
+        ["Hyundai Motor India Ltd.","Passenger vehicles","67,654","8.1%","0.05%","—"],
+        ["Toyota Kirloskar Motor Pvt. Ltd.","Passenger vehicles","64,865","8.7%","—","4.31%"]
+      ]
+    },
+    firmConcNote: "Concentration is low and essentially flat over the decade. Computed from the full firm universe reporting revenue each year (see chart above), sector HHI stood at 208.4 in 2024-25, close to its 2014-15 starting point of 213.5, comfortably inside the 'Competitive' band throughout. The top-3 firms' combined share on this same full-universe basis was 18.3% in 2024-25 (982 firms reporting) — a materially different figure from the sector's earlier top-firm-sample HHI measure, because the denominator here is the sector's entire reporting population, not a fixed shortlist. R&D and export-intensity fields are blank at source for most of the top 5 by revenue; the firms that actually lead the sector on R&D and export value and intensity are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, transport_equipment_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["Mahindra & Mahindra Ltd.","975.53"],
+        ["Hero Motocorp Ltd.","732.83"],
+        ["Bajaj Auto Ltd.","574.10"],
+        ["Ashok Leyland Ltd.","529.58"],
+        ["Bosch Ltd.","526.00"]
+      ]
+    },
+    rndByValueNote: "By absolute spend, Mahindra & Mahindra leads (₹976 crore), consistent with its scale and its comparatively high 0.82% R&D intensity among the largest firms in the top-5-by-revenue table above. Bosch Ltd. is the only firm to appear on both this by-value list and the intensity-leaders list below — a large, R&D-heavy component supplier rather than a firm whose R&D looks large only because its revenue base is large.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25. Source: Prowess IQ, 2026 pull, transport_equipment_rnd_leaders.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Pinnacle Mobility Solutions Pvt. Ltd.","24.39","234.31","10.41%"],
+        ["High Energy Batteries (India) Ltd.","7.51","81.00","9.27%"],
+        ["Kinetic Green Energy & Power Solutions Ltd.","7.95","215.08","3.70%"],
+        ["Ecocat (India) Pvt. Ltd.","8.54","262.54","3.25%"],
+        ["Bosch Ltd.","526.00","18,087.40","2.91%"]
+      ]
+    },
+    rndLeadersNote: "R&D intensity in Transport Equipment is led by small, specialised EV-mobility and battery firms (Pinnacle Mobility, High Energy Batteries, Kinetic Green), plus Ecocat (emissions-control components), not by the large vehicle OEMs that dominate the sector by revenue. Bosch Ltd. is the only firm appearing on both this intensity list and the by-value list above, and at ₹18,087 crore revenue is by far the largest firm on either R&D list — a large-scale component supplier that is also genuinely R&D-intensive, unlike the smaller, purely specialised firms filling the rest of the intensity ranking.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, transport_equipment_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Balkrishna Industries Ltd.","4,041.75"],
+        ["Toyota Kirloskar Motor Pvt. Ltd.","2,794.95"],
+        ["M R F Ltd.","2,044.14"],
+        ["Victora Auto Pvt. Ltd.","1,936.30"],
+        ["Bosch Ltd.","1,539.90"]
+      ]
+    },
+    exportByValueNote: "Balkrishna Industries Ltd. (off-highway tyres) leads by a wide margin in absolute export value (₹4,042 crore). Toyota Kirloskar Motor Pvt. Ltd. also appears in the top-5-by-revenue table above, where its export intensity is separately reported at 4.31% — the only firm to appear on both the revenue leaderboard and an export leaderboard in this section. Bosch Ltd. appears here as well as on both R&D leader tables above, underscoring its position as a large, diversified, R&D- and export-intensive component supplier rather than a narrow specialist.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25. As with R&D, these are largely not the sector's largest firms by revenue or by absolute export value. Source: Prowess IQ, 2026 pull, transport_equipment_export_leaders.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Sigma Corporation (India) Pvt. Ltd.","210.66","224.00","94.04%"],
+        ["A V I Worldwide Pvt. Ltd.","337.17","388.50","86.79%"],
+        ["Rambal Pvt. Ltd.","129.52","159.79","81.05%"],
+        ["Anand Motor Products Pvt. Ltd.","249.93","320.48","77.99%"],
+        ["A R G L Ltd.","235.80","317.45","74.28%"]
+      ]
+    },
+    exportLeadersNote: "None of the five export-intensity leaders overlaps with the by-value export leaders above — these are smaller, near-fully export-oriented component and parts specialists (Sigma Corporation, A V I Worldwide, Rambal, Anand Motor Products, A R G L) rather than the larger, more domestically-oriented exporters that dominate the sector's absolute export value.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 1,131 firms reporting in the sector in 2014-15, 219 have stopped reporting entirely and a further 13 are dormant (reporting but with negligible or zero activity), leaving 899 still active. Combined churn (stopped-reporting plus dormant) is 232 firms, or 20.5% of the original 2014-15 universe — a moderate churn rate relative to other sectors in this series. This 1,131-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year, 1,080 in 2014-15), which is why the two firm counts for FY2014-15 differ slightly (1,131 vs 1,080)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "Financials strengthening in step with the output index",
+    subhead: "Unlike sectors where firm-level health and sector-wide output diverge, Transport Equipment shows both moving the same direction: financial ratios have improved steadily and the IIP has climbed to an all-time high after a sharp COVID trough.",
+    iipChart: {
+      title: "IIP index, Transport Equipment, 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [99.9,100.3,104.6,104.2,105.9,119.7,128.9,109.9,89.4,100.8,117.8,132.3,141.1,157.8],
+      annotations: [
+        {index:6, label:"pre-COVID peak 128.9", color:"var(--thread-turmeric)"},
+        {index:8, label:"89.4 (COVID trough)", color:"var(--thread-madder)"},
+        {index:13, label:"157.8 (all-time high, latest)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[2.63,1.70,5.04,7.21]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[7.32,6.67,13.70,17.53]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Transport Equipment — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2022-23"],
+      rows: [
+        ["Workers per factory","113.5","135.9","153.3"],
+        ["Wages per worker (₹)","1,65,793","2,39,412","2,49,789"],
+        ["Output per worker (₹)","66,50,485","90,46,151","1,07,06,084"],
+        ["Productivity–wage ratio","5.96","5.02","5.86"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","2.6%","7.2%"],
+        ["ROE %","7.3%","17.5%"],
+        ["ROCE %","12.4%","19.9%"],
+        ["Debt-to-Equity (×)","0.62","0.24"],
+        ["Interest Cover (×)","3.32","12.4"],
+        ["Current Ratio","1.08","1.24"],
+        ["Free Cash Flow (₹ mn)","46,153","7,24,769"]
+      ]
+    },
+    fcfNote: "Free Cash Flow is volatile rather than steadily improving: a low of ₹5,954 million in 2018-19, a peak of ₹9,63,775 million in 2023-24, before easing to ₹7,24,769 million in 2024-25 as capital expenditure (Purchase of Fixed Assets) rose to ₹9,30,111 million, the highest of the decade.",
+    rndPct: "0.40%",
+    rndLabel: "of sales — R&D spend, down from 0.79% a decade earlier",
+    rndFlag: "R&D spend has declined from 0.79% of sales in 2014-15 to 0.40% in 2024-25, more than halving over the decade and remaining in the 'laggard' band throughout (Leader >3%, Active 1–3%, Laggard <1%, per the Institute's thresholds). Unlike a flat structural feature, this is a falling trend worth watching as sales growth has outpaced R&D growth.",
+    narrative: "Transport Equipment tracked close to the overall manufacturing index through the mid-2010s, pulled ahead sharply from 2017-18 as BS-IV to BS-VI emission-norm transitions and pre-buying cycles lifted output, then fell 30.7% index points in the COVID year (2020-21) as vehicle demand collapsed. Recovery since has been the strongest of any comparably-sized sector: the index has more than reversed its COVID loss and now sits at an all-time high of 157.8, some 22% above the pre-COVID 2018-19 peak. The Institute's own analysis attributes the post-COVID acceleration to three forces: rapid EV adoption and a nationwide public-transport and railway-rolling-stock overhaul (Vande Bharat, Amrit Bharat, metro and RRTS builds), the Ministry of Defence's Positive Indigenisation Lists shifting military vehicle, aircraft and vessel orders to domestic manufacturers, and record public capital expenditure feeding both road-building equipment and commercial-vehicle demand. The sector's volatility (10.7 standard-deviation points in year-on-year growth, full period) is real but has fallen sharply since COVID, consistent with a sector settling into a structurally faster, if still uneven, growth path."
+  },
+
+  trade: {
+    eyebrow: "03 — Trade",
+    title: "A volatile but currently healthy trade surplus",
+    subhead: "Transport Equipment swings between small trade deficits and larger surpluses year to year, unlike sectors with a steady one-directional trade balance. The latest year is comfortably in surplus, with exports outrunning imports.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[193517,169133,215008,246379,277492,346034,347421]},
+        {name:"Imports", color:"var(--thread-madder)", values:[196352,130331,155023,252654,250719,280895,303444]}
+      ]
+    },
+    stats:[
+      {n:"24.7%", l:"export growth, FY24-25"},
+      {n:"12.0%", l:"import growth, FY24-25 — slower"},
+      {n:"44.8%", l:"import dependency"},
+      {n:"12.3%", l:"export 5-year CAGR"},
+      {n:"7.4%", l:"import 5-year CAGR"}
+    ],
+    netForexNote: "A separate company-financials cross-check points the other direction from the customs-based trade figures: aggregate Net Forex (Forex Earnings minus Forex Outgo, reported directly by CMIE-tracked companies) was net negative at −₹4,450 million in 2024-25, and has been negative in 8 of the last 11 years. This is not a contradiction of the customs-based trade surplus; the two measures cover different scopes. Company-level Forex Outgo includes royalty and technical know-how remittances, imported capital-goods payments, and dividend repatriation, none of which sit inside the goods-trade customs figure, while the company panel itself covers only CMIE-tracked firms rather than the full universe of exporters and importers. Read together, the two measures suggest Transport Equipment earns a real trade surplus on finished-goods trade while remaining a net payer of foreign exchange once technology licensing, capital imports and profit repatriation are included.",
+    caveatNote: "Figures in this section are directional rather than exact — the underlying HS-to-NIC concordance maps 95% of export value and 89% of import value to a sector; the remainder is unclassified and excluded rather than estimated. A further caveat specific to this sector: the single largest product line on both the export and import side is large aircraft (unladen weight over 15,000 kg), which mostly reflects airline fleet purchases and leasing rather than domestically manufactured aircraft content; readers focused on manufacturing capability should weight the vehicle, engine and component lines more heavily than the aircraft trade figures.",
+    partnersTable:{
+      note: "Top-5 partners by value, FY24-25",
+      cols:["#","Export partner (₹ cr)","Import partner (₹ cr)"],
+      rows:[
+        [1,"USA — 35,820","USA — 37,013"],
+        [2,"UAE — 32,854","UAE — 27,601"],
+        [3,"Singapore — 28,078","China — 24,703"],
+        [4,"Saudi Arabia — 23,762","Saudi Arabia — 7,221"],
+        [5,"UK — 11,856","Switzerland — 1,780"]
+      ]
+    },
+    productsTable:{
+      note: "Top-5 HS products by value, FY24-25",
+      cols:["#","Export product (₹ cr)","Import product (₹ cr)"],
+      rows:[
+        [1,"Aeroplanes >15,000 kg unladen — 46,823","Aeroplanes >15,000 kg unladen — 104,810"],
+        [2,"Passenger vehicles, 1000–1500cc — 43,152","Turbo-jets, thrust >25 kN — 28,016"],
+        [3,"Turbo-jets, thrust >25 kN — 40,320","Other vehicle parts & accessories — 19,404"],
+        [4,"Other vehicle parts & accessories — 30,173","Gear boxes — 13,391"],
+        [5,"Motorcycles, 50–250cc — 22,551","Tankers (ships) — 11,128"]
+      ]
+    }
+  },
+
+  investment: {
+    eyebrow: "04 — Investment & PLI",
+    title: "A private-sector story with a genuinely thin PLI disbursement",
+    subhead: "New investment is overwhelmingly Indian-private-led, and the completed-project pipeline shows a handful of very large projects landing in the latest year. The PLI scheme's actual disbursement remains a small fraction of its total design outlay, consistent with a scheme still in its early disbursement years.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[49581,104829,168099]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[35262,38873,34718]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE CapEx database.",
+      cols:["Indicator","Value"],
+      rows:[
+        ["Total investment outstanding","₹7,84,232 cr (227 projects)"],
+        ["Under implementation","₹2,94,358 cr (100 projects)"],
+        ["Implementation stalled","₹6,006 cr (9 projects)"],
+        ["Investments completed","₹76,619 cr (19 projects, up sharply from ₹5,556 cr in 2023-24)"],
+        ["New investments announced","₹1,68,099 cr (55 projects, up from ₹1,05,970 cr)"]
+      ]
+    },
+    dropFlag:"Completed-project value jumped roughly 14× in 2024-25 (₹5,556 cr → ₹76,619 cr) while completed-project count rose only modestly (17 → 19), meaning a handful of very large projects landed rather than a broad-based completion wave. The Implementation Stalled figure (₹6,006 cr, 9 projects) is identical in both 2023-24 and 2024-25, which may reflect a genuinely static stalled-project stock or a data refresh gap in this indicator; worth confirming against a fresher CMIE pull.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore)",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Tamil Nadu","42,803","58,126","62,102"],
+        ["Maharashtra","90,895","91,370","1,59,488"],
+        ["Haryana","24,887","21,347","17,805"]
+      ]
+    },
+    stateNote: "Haryana's outstanding investment stock is shrinking even as it remains a top-3 GVO state (₹24,887 cr in 2019-20 down to ₹17,805 cr in 2024-25), a contrast to Maharashtra's sharp pipeline expansion over the same window. This is consistent with Haryana's Gurugram-Manesar-Bawal cluster being a mature, already-built-out hub rather than a frontier for new capacity.",
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[4307,0,123559,40233]
+    },
+    ownershipNote:"Indian Private Sector dominates new investment overwhelmingly at ₹1,23,559 crore in 2024-25; Foreign Private is meaningful at ₹40,233 crore; combined government share is under 3% of the total.",
+    pliNote:"PLI scheme for Automobile and Auto Components: total approved multi-year outlay ₹25,938 crore (Ministry of Heavy Industries, covering FY2023-24 to FY2027-28 after a one-year extension). CMIE's Revised Estimate for 2024-25 is ₹403.9 crore; independent reporting puts cumulative actual disbursement at roughly ₹1,350 crore as of December 2025, and the Union Budget's 2026-27 allocation was doubled to ₹5,940 crore, both broadly consistent with CMIE's own Budget Estimate figures for the same years. Actual disbursement to date remains a small single-digit percentage of the total scheme outlay, consistent with a scheme whose incentive payments only began flowing from FY2024-25 onward.",
+    fdiNote:"Cumulative FDI into the DPIIT-classified 'Automobile' sector: approximately ₹2,64,456 crore (US$39.7 billion) between April 2000 and December 2025 (source: IBEF/DPIIT). This DPIIT classification is narrower than the Transport Equipment sector definition used in this paper (NIC 29 + 30, which also covers rail, aerospace and shipbuilding beyond automobiles), so the figure should be read as a lower-bound, automobile-specific proxy rather than a full-sector total.",
+    rndHighlight: { pct: "0.40%", label: "R&D spend as share of sales, 2024-25 — down from 0.79% a decade earlier", band: "Laggard (<1%)", note: "PLI's actual FY24-25 disbursement (₹403.9 cr, CMIE RE) is roughly half the sector's annual R&D spend (₹759.9 cr in 2024-25), and both are a rounding error against the sector's ₹16.27 lakh crore GVO. The sector's growth over the past decade has come overwhelmingly from scaling existing production rather than from either policy incentives or in-house R&D." },
+    insightBox:"Unlike a sector where investment and R&D reinforce each other, Transport Equipment's growth story so far is a volume and capacity-utilisation story: sales and output have roughly doubled while the R&D share of sales has fallen, and the policy incentive designed to shift that mix (PLI) has disbursed only a small fraction of its committed outlay to date."
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Maharashtra and Tamil Nadu lead on scale, Haryana pays least",
+    subhead: "Maharashtra and Tamil Nadu are close rivals at the top by output, with Haryana a clear third. Karnataka and Gujarat trail well behind on scale despite higher wages per worker, pointing to a smaller number of higher-value operations.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Maharashtra","Tamil Nadu","Haryana","Karnataka","Gujarat"],
+      values:[359184,334310,307282,139110,88623]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5",
+      xLabel:"State", yLabel:"% of national GVO",
+      valueSuffix: "%",
+      labels:["Maharashtra","Tamil Nadu","Haryana","Karnataka","Gujarat"],
+      values:[22.08,20.55,18.88,8.55,5.45]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Maharashtra","Tamil Nadu","Haryana","Karnataka","Gujarat"],
+      values:[298721,292463,228256,309701,228306]
+    },
+    stateTable:{
+      note:"Top-5 states, latest available ASI year (2023-24)",
+      cols:["State","Factories","GVO share","Persons engaged","Wages/worker"],
+      rows:[
+        ["Maharashtra","1,758","22.1%","20.1%","₹2,98,721"],
+        ["Tamil Nadu","1,730","20.5%","21.4%","₹2,92,463"],
+        ["Haryana","1,022","18.9%","17.2%","₹2,28,256"],
+        ["Karnataka","661","8.5%","7.7%","₹3,09,701"],
+        ["Gujarat","420","5.5%","4.3%","₹2,28,306"]
+      ]
+    },
+    flag:"Top-5 states account for ~75.5% of national GVO, a notably higher concentration than the geography of most other manufacturing sectors, reflecting the auto industry's cluster-driven, OEM-anchored structure. Karnataka stands out for pairing the highest wages per worker in the top-5 (₹3,09,701) with the lowest factory count and GVO share among them, consistent with Bengaluru's cluster leaning toward higher-value component and precision-engineering work rather than high-volume assembly.",
+    jharkhandTitle:"A note on smaller manufacturing states",
+    jharkhandText:"Beyond the top-5, states like Uttarakhand (₹78,469 crore GVO, 2023-24, anchored by the Pantnagar and Haridwar auto-component belt) and Andhra Pradesh (₹60,166 crore, only 79 factories, reflecting a small number of very large plants) post meaningful absolute output without appearing in the top-5-by-share ranking used above. Odisha, Assam and several smaller states report Transport Equipment GVO under ₹5,000 crore, with negligible factory counts, structural non-participants in this sector's manufacturing base rather than emerging producers."
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Four well-documented OEM-anchored clusters",
+    subhead: "The sector's clusters are unusually well mapped compared to other sectors in this series: each has named anchor OEMs, testing infrastructure, and export orientation on record, closely mirroring the top states identified above.",
+    clusterChips:[
+      "Chennai (Kancheepuram/Chengalpattu), Tamil Nadu — 340 SME/large units + 2,245 component makers",
+      "Pune, Maharashtra — 4,000+ manufacturing and ancillary units",
+      "Gurugram–Manesar–Bawal, Haryana — 1,000+ vendor units",
+      "Sanand, Gujarat — 80 registered auto units"
+    ],
+    clusterTable:{
+      note:"Principal Transport Equipment clusters, selected indicators. Source: Cluster Supply Chain Linkage Workbook.",
+      cols:["Cluster","State","Units (est.)","Anchor firms","Principal products","Export orientation"],
+      rows:[
+        ["Chennai Automotive Cluster","Tamil Nadu","340 SME/large + 2,245 component makers","Hyundai, Renault-Nissan, BMW, Ashok Leyland, Daimler Truck, Royal Enfield","Passenger cars, commercial vehicles, motorcycles, engines, components, tyres","Yes (North America, Europe, Middle East, Latin America, Africa, Asia-Pacific)"],
+        ["Pune Automotive Cluster","Maharashtra","4,000+ units","Passenger and commercial vehicle OEMs, precision-component firms","Passenger and premium cars, commercial vehicles, motorcycles, engines, transmissions, auto electronics","Yes (North America, Europe, Middle East)"],
+        ["Gurugram–Manesar–Bawal Cluster","Haryana","1,000+ vendor units","Maruti Suzuki, Hero MotoCorp, Honda Motorcycle & Scooter India, Uno Minda, Suzuki Motorcycle India","Passenger vehicles, motorcycles, engines, transmission systems, components, electrical systems","Partial (Asia, Europe, Africa)"],
+        ["Sanand Cluster","Gujarat","80 registered units","Tata Motors, Suzuki Motor Gujarat (Maruti Suzuki), Hitachi","Passenger vehicles, EVs, engines, components","Partial (Europe, Latin America, Middle East, Africa)"]
+      ]
+    },
+    note:"Cluster locations align tightly with the Geography theme's top states: Chennai/Tamil Nadu, Pune/Maharashtra, Gurugram-Manesar-Bawal/Haryana and Sanand/Gujarat cover four of the top five states by GVO share, an unusually clean match compared to other sectors in this series where cluster and state-level geography diverge.",
+    noteD:"All four clusters carry a Y (Yes) or Partial export-orientation flag and named anchor OEMs, a materially more complete data picture than typical for this workbook. Cluster rank (within-sector) is recorded for three of the four: Chennai (rank 1), Pune (rank 2), Gurugram-Manesar-Bawal (rank 3), Sanand (rank 4).",
+    noteE:"Chennai and Pune both report turnover as 'data not available' in the underlying register despite otherwise detailed profiles; only Chennai carries a specific output-value figure (₹1,900 crore per annum, though this figure appears low relative to the cluster's stated OEM roster and is worth independent verification before it is cited on its own)."
+  }
+};
+
+/* =====================================================================
+   THE SECTOR STORY
+   ===================================================================== */
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "Scaling fast, on firmer financial footing than most",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Transport Equipment stands today.",
+  sections: [
+    { h: "The core story: output, firm health and investment all pointing the same way", p: [
+      "Transport Equipment is not just growing by the raw counts, it is growing on nearly every measure at once. Factories rose from 8,178 to 8,869 (2014-15 to 2023-24), persons engaged from 11.95 lakh to 17.88 lakh, and GVO from ₹6.17 lakh crore to ₹16.27 lakh crore, a 163.5% increase, national ASI totals. Financial performance of tracked firms has improved just as sharply: PAT margin rose from 2.6% (2014-15) to 7.2% (2024-25), ROE from 7.3% to 17.5%, ROCE from 12.4% to 19.9%, and debt-to-equity fell from 0.62x to 0.24x. Firms remain highly competitive on a full-universe basis (HHI 208.4, competitive band, computed across the sector's entire reporting population rather than a fixed top-firm sample), with the top-3 firms' combined share essentially flat over the decade at 18.3% in 2024-25 against 18.7% in 2014-15.",
+      "The IIP tells the same story from a different angle. Transport Equipment fell 30.7 index points in the COVID year, the sharpest shock among comparably-sized sectors, but has recovered further and faster than almost any other sector on record: the index now sits at an all-time high of 157.8, roughly 22% above its pre-COVID peak, with the single fastest latest-year growth rate (11.8%) of the sectors covered so far. The Institute attributes this to EV adoption, a nationwide rail and metro rolling-stock build-out, defence indigenisation shifting military orders to domestic manufacturers, and record public infrastructure capital expenditure, structural tailwinds rather than a one-off bounce."
+    ]},
+    { h: "Trade: a volatile but currently healthy surplus", p: [
+      "Transport Equipment runs a trade surplus (₹65,139 crore in FY24-25) but, unlike sectors with a steady one-directional balance, this one swings: the sector ran small deficits in 2019-20 and 2022-23 before this year's surplus. Exports are growing faster than imports in the latest year (24.7% vs 12.0% YoY, and 12.3% vs 7.4% on a five-year CAGR basis), a healthier trade posture than sectors where imports are outpacing exports. The largest single product line on both sides of the ledger is large aircraft, which mostly reflects airline fleet purchases rather than domestic manufacturing content, worth discounting when reading the trade figures as a pure manufacturing-capability signal. A company-level cross-check tells a more cautious story: aggregate Net Forex was negative in 2024-25 and in 8 of the last 11 years, reflecting royalty payments, capital-goods imports and profit repatriation that sit outside the customs-based trade figure."
+    ]},
+    { h: "Investment: private-sector-led, with PLI still in its early disbursement years", p: [
+      "New investment is overwhelmingly private, Indian Private Sector investment reached ₹1,23,559 crore in 2024-25 against a combined government share under 3%, with Foreign Private investment a meaningful ₹40,233 crore. Completed-project value jumped roughly 14-fold in the latest year (₹5,556 crore to ₹76,619 crore) on only a modest rise in project count, meaning a handful of very large projects landed rather than a broad-based completion wave. The PLI scheme for Automobile and Auto Components carries a total approved outlay of ₹25,938 crore running to FY2027-28, but actual disbursement remains a small fraction of that, roughly ₹1,350 crore cumulative as of December 2025 by independent reporting, broadly consistent with CMIE's own estimates. R&D spend, meanwhile, has fallen from 0.79% of sales to 0.40% over the decade, so the sector's growth so far reads as a volume and capacity story more than an innovation or policy-incentive-driven one."
+    ]},
+    { h: "Geography: Maharashtra and Tamil Nadu neck and neck, Karnataka the value outlier", p: [
+      "Maharashtra (22.1% of national GVO, ₹3,59,184 crore) and Tamil Nadu (20.5%, ₹3,34,310 crore) are close rivals at the top, with Haryana a clear third (18.9%, ₹3,07,282 crore). Together with Karnataka and Gujarat, the top-5 states account for roughly 75.5% of national output, a tighter geographic concentration than most other manufacturing sectors, consistent with the auto industry's cluster-anchored structure. Karnataka is the notable outlier: the highest wages per worker among the top-5 (₹3,09,701) paired with the smallest factory count and GVO share, suggesting a smaller number of higher-value component and precision-engineering operations rather than high-volume assembly. Haryana's investment pipeline is shrinking even as its output share holds, consistent with a mature, already-built-out cluster rather than a frontier for new capacity."
+    ]},
+    { h: "Clusters: unusually well documented, and tightly aligned with the state-level geography", p: [
+      "Four major clusters are formally registered with named anchor OEMs and testing infrastructure, Chennai (Tamil Nadu), Pune (Maharashtra), Gurugram-Manesar-Bawal (Haryana) and Sanand (Gujarat), and all four line up closely with the top states identified above, a materially cleaner mapping than typical for this data series. All four carry an export-orientation flag (three fully export-oriented, one partial), and all name specific anchor firms and testing or homologation infrastructure (ARAI, ICAT, GARC). Turnover and export-value figures remain thin for two of the four clusters (Chennai, Pune both marked 'data not available' for turnover), and the one specific output figure available (Chennai, ₹1,900 crore per annum) looks low relative to the cluster's stated OEM roster and is flagged here for independent verification rather than treated as settled."
+    ]},
+    { h: "R&D: a laggard, and a declining one", p: [
+      "R&D spend as a share of sales fell from 0.79% in 2014-15 to 0.40% in 2024-25, more than halving over the decade and remaining throughout in the 'laggard' band (below 1%). This is a different pattern from a flat structural feature: the decline suggests sales growth has consistently outpaced R&D investment, even as the sector has become financially healthier by every other measure. Read alongside the PLI scheme's thin actual disbursement to date, the sector's decade of growth looks driven overwhelmingly by scaling existing production and capitalising on demand cycles (BS-VI transition, EV adoption, public infrastructure spend) rather than by a shift toward higher R&D intensity."
+    ]}
+  ],
+  summary: [
+    {n:"+163.5%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"157.8", l:"IIP index, all-time high, 2025-26"},
+    {n:"0.79%→0.40%", l:"R&D spend, share of sales, 2014-15 → 2024-25"},
+    {n:"₹1,350 cr", l:"PLI cumulative actual disbursement, to Dec 2025"},
+    {n:"213.5→208.4", l:"HHI, full-universe basis, 2014-15 → 2024-25"}
+  ],
+  takeaway: "Transport Equipment is a sector where scale, firm financial health and the official output index are all moving in the same direction at once, a genuinely stronger combination than most manufacturing sectors show. The open questions sit elsewhere: a trade balance that swings between deficit and surplus year to year rather than holding a steady direction, a company-level forex position that stays negative even in trade-surplus years, an R&D share that is falling rather than flat, and a PLI scheme whose actual disbursement has barely begun relative to its committed size. None of these undercut the headline growth story, but they mark where the sector's next phase of competitiveness will actually be decided.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, 2014-15 to 2023-24.",
+    "Index of Industrial Production, Base 2011-12, Ministry of Statistics and Programme Implementation.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, firm-level panel by sector, FY14-15 to FY24-25.",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates, FY14-15 to FY24-25.",
+    "Cluster Supply Chain Linkage Workbook, compiled from published cluster profiles for Chennai, Pune, Gurugram-Manesar-Bawal and Sanand.",
+    "Ministry of Heavy Industries, PLI Scheme for Automobile and Auto Component Industry, scheme guidelines and Year End Review 2024-25.",
+    "Department for Promotion of Industry and Internal Trade, FDI statistics by sector, via India Brand Equity Foundation, April 2000 to December 2025.",
+    "CMIE Industry Outlook, Transport Equipment sector, aggregate all-companies basis, 2014-15 to 2024-25."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to 75.1% of item-level manufacturing weight against an official total of 77.6%. The residual is unreconciled sub-group weight and does not affect this sector's own index level or growth figures."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures maps 95% of export value and 89% of import value to a sector. The remainder is unclassified and excluded rather than estimated; treat trade figures as directional rather than exact. The large-aircraft trade lines specifically reflect airline fleet purchases more than domestic manufacturing content."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"HHI figures are computed from the full firm universe reporting positive Revenue From Operations each year (982 to 1,093 firms depending on the year), not a fixed top-firm sample. This methodology was adopted sector-wide in the 2026 Prowess data refresh and supersedes an earlier top-firm-sample HHI series once shown on this page; the two are not comparable, and the full-universe series reads substantially lower by construction."},
+    {tag:"(e)", text:"PLI actual-disbursement figures blend two sources with different vintages: CMIE's Revised Estimate for 2024-25 (₹403.9 crore) and independently reported cumulative disbursement of approximately ₹1,350 crore as of December 2025. Both are cited because CMIE's workbook does not carry a separate 'actual spend' line for this sector, unlike the clean actual-disbursement figure available for some other sectors in this series."},
+    {tag:"(f)", text:"Cumulative FDI (₹2,64,456 crore) is sourced against DPIIT's narrower 'Automobile' sectoral classification and should be read as a lower-bound proxy for the broader Transport Equipment definition (NIC 29 + 30) used throughout this paper, which also covers rail, aerospace and shipbuilding."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · NIC Divisions 29, 30 · Primary Research: Nidhi Patel · Compiled by: Riddhi Bhargava"
+};
+
+/* =====================================================================
+   LAYOUT — canvas positions for each node.
+   ===================================================================== */
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+/* Value labels on bars/points must stay compact but exact-ish; short-form
+   for big absolute figures, one-decimal for anything under 1000. */
+function fmtVal(v){
+  if(Math.abs(v)>=1000) return fmtShort(v);
+  if(Number.isInteger(v)) return v.toString();
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  const multi = series.length>1;
+  series.forEach((ser,si)=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`;
+      const above = multi ? (si%2===0) : true;
+      const ly = above ? y-12 : y+20;
+      s+=`<text class="value-label" x="${x}" y="${ly}" text-anchor="middle" fill="${ser.color}">${fmtVal(v)}</text>`;
+    });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<text class="bar-value-label" x="${cx}" y="${y-10}" text-anchor="middle">${fmtVal(v)}${cfg.valueSuffix||''}</text>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <h1 class="cc-title">${c.title}</h1>
+      <h2>Primary Researcher: Nidhi Patel</h2>
+      <h2>Compiled by: Riddhi Bhargava</h2>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">${d.rndPct}</div><div class="rnd-label">${d.rndLabel}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.stats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <div style="margin-top:26px">${table(d.partnersTable)}</div></div></div>
+    <div class="grid1"><p class="block-title">Net Forex cross-check</p><p class="narrative" style="font-size:18px">${d.netForexNote}</p></div>
+    <div class="grid1">${table(d.productsTable)}</div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="rnd-callout" style="margin-top:8px"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap"><div class="rnd-num">${d.rndHighlight.pct}</div><div><div class="rnd-label">${d.rndHighlight.label}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">${d.rndHighlight.band}</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div></div></div><p class="rnd-note" style="margin-top:14px">${d.rndHighlight.note}</p></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    <h3 style="font-family:var(--display);font-size:25px;font-weight:600;margin:36px 0 10px;color:var(--thread-indigo)">${d.jharkhandTitle}</h3>
+    <p class="narrative" style="font-size:18px">${d.jharkhandText}</p>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <p class="block-title">Registered clusters</p>
+    <div class="chip-row">${d.clusterChips.map(c=>`<div class="chip">${c}</div>`).join("")}</div>
+    <div class="grid1" style="margin-top:30px">${table(d.clusterTable)}</div>
+    <div class="flag" style="margin-top:20px">${d.note}</div>
+    <p class="block-note" style="margin-top:16px"><b>Note (d):</b> ${d.noteD}</p>
+    <p class="block-note" style="margin-top:8px"><b>Note (e):</b> ${d.noteE}</p>
+    </div>`;
+}
+
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Transport Equipment Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manufacturing Competitiveness Report — Sector Snapshots</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700;9..144,900&family=Fraunces:ital,opsz,wght@1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — broadsheet newsprint: cream, ink, editorial red.
+     ============================================================ */
+  :root{
+    --paper:#f2ede1;
+    --paper-2:#e9e1cd;
+    --ink:#181611;
+    --ink-70:rgba(24,22,17,0.72);
+    --ink-50:rgba(24,22,17,0.52);
+    --ink-32:rgba(24,22,17,0.32);
+    --rule:#181611;
+    --red:#9a2b1f;
+    --display: 'Fraunces', serif;
+    --display-italic: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     MASTHEAD
+     ============================================================ */
+  .sheet{max-width:1180px;margin:0 auto;padding:0 32px;}
+
+  .dateline{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+    padding:22px 0 16px;font-family:var(--body);font-size:12px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--ink-70);
+    border-bottom:1px solid var(--rule);
+  }
+  .dateline span{white-space:nowrap;}
+  .dateline .mid{color:var(--red);}
+
+  header{padding:40px 0 0;text-align:center;border-bottom:3px solid var(--rule);}
+  .masthead{
+    font-family:var(--display);font-weight:800;font-size:clamp(40px,7vw,88px);
+    line-height:0.98;letter-spacing:-0.01em;margin:0 0 6px;color:var(--ink);
+  }
+  .masthead .thin{font-weight:300;}
+  .kicker{
+    font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-50);margin:0 0 26px;
+  }
+  .subbar{
+    background:var(--ink);color:var(--paper);
+    font-family:var(--body);font-weight:600;font-size:14px;letter-spacing:.08em;
+    text-transform:uppercase;padding:13px 20px;margin:0 0 0;
+  }
+  .lede{
+    max-width:760px;margin:30px auto 0;padding-bottom:34px;
+    font-family:var(--display);font-size:19px;line-height:1.62;color:var(--ink-70);
+    text-align:left;
+  }
+  .lede .dropcap{
+    float:left;font-family:var(--display);font-weight:700;font-size:64px;
+    line-height:0.78;padding:6px 8px 0 0;color:var(--ink);
+  }
+
+  /* ============================================================
+     SECTION LABEL
+     ============================================================ */
+  .section-label{
+    display:flex;align-items:center;gap:14px;margin:52px 0 26px;
+  }
+  .section-label span{
+    font-family:var(--body);font-weight:700;font-size:13px;letter-spacing:.14em;
+    text-transform:uppercase;white-space:nowrap;color:var(--ink);
+  }
+  .section-label::after{content:"";flex:1;height:1px;background:var(--rule);}
+
+  /* ============================================================
+     FLIP CARDS — the masthead's "inside this edition" index
+     ============================================================ */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;padding-bottom:64px;}
+  @media (max-width:940px){.grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:600px){.grid{grid-template-columns:1fr;}}
+
+  .card-flip{
+    perspective:1400px;height:250px;
+    text-decoration:none;color:inherit;display:block;
+  }
+  .card-inner{
+    position:relative;width:100%;height:100%;
+    transition:transform .55s cubic-bezier(.4,.2,.2,1);
+    transform-style:preserve-3d;
+  }
+  .card-flip:hover .card-inner,
+  .card-flip:focus-visible .card-inner{transform:rotateY(180deg);}
+
+  .face{
+    position:absolute;inset:0;backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    border:1px solid var(--rule);padding:24px 22px 20px;
+    display:flex;flex-direction:column;
+  }
+
+  .face-front{background:var(--paper-2);}
+  .face-front .tag{
+    font-family:var(--body);font-size:11.5px;font-weight:700;letter-spacing:.1em;
+    color:var(--red);text-transform:uppercase;margin:0 0 14px;
+  }
+  .face-front h3{
+    font-family:var(--display);font-weight:700;font-size:24px;line-height:1.14;
+    margin:0 0 12px;color:var(--ink);
+  }
+  .face-front .rule{height:1px;background:var(--ink-32);margin:0 0 12px;}
+  .face-front .teaser{
+    font-family:var(--display);font-style:italic;font-weight:400;font-size:14.5px;
+    line-height:1.5;color:var(--ink-70);margin:0;flex-grow:1;
+  }
+  .face-front .cont{
+    font-family:var(--body);font-size:11.5px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-50);margin-top:12px;
+  }
+
+  .face-back{
+    background:var(--ink);color:var(--paper);transform:rotateY(180deg);
+    justify-content:space-between;
+  }
+  .face-back .tag{
+    font-family:var(--body);font-size:11.5px;font-weight:700;letter-spacing:.1em;
+    color:#d98a7a;text-transform:uppercase;margin:0 0 14px;
+  }
+  .face-back p{
+    font-family:var(--body);font-size:14px;line-height:1.6;color:rgba(242,237,225,0.86);
+    margin:0;
+  }
+  .face-back .go{
+    font-family:var(--display);font-weight:600;font-size:16px;color:var(--paper);
+    display:inline-flex;align-items:center;gap:8px;margin-top:16px;
+  }
+  .face-back .go::after{content:"→";transition:transform 160ms ease;}
+  .card-flip:hover .face-back .go::after{transform:translateX(5px);}
+
+  footer{max-width:1180px;margin:0 auto;padding:0 32px 90px;}
+  .colophon{
+    font-family:var(--body);font-size:12px;color:var(--ink-50);line-height:1.7;
+    border-top:1px solid var(--rule);padding-top:20px;
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="dateline">
+    <span>Vol. I — No. 01</span>
+    <span class="mid">Institute of Manufacturing and Economy</span>
+    <span>Working Paper Series · 2026</span>
+  </div>
+
+  <header>
+    <p class="masthead">Manufacturing<br><span class="thin">Competitiveness Report</span></p>
+    <p class="kicker">Ten Sectors, One Decade of Data</p>
+  </header>
+
+  <p class="subbar">Sector-by-sector snapshots of Indian manufacturing</p>
+
+  <p class="lede"><span class="dropcap">S</span>cale, financial performance, trade, investment, geography and cluster structure — built from Annual Survey of Industries, CMIE Prowess, Index of Industrial Production and DGCI&amp;S trade data. Hover any entry below to read its brief, then open the full snapshot.</p>
+
+  <div class="section-label"><span>Inside This Edition</span></div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<footer>
+  <div class="colophon">Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · Compiled by: Riddhi Bhargava</div>
+</footer>
+
+<script>
+const SECTORS = [
+  { name:"Textiles", teaser:"India's largest employer of factory labour in manufacturing.", desc:"India's largest employer of factory labour in manufacturing — growing in scale, losing relative ground on output.", href:"textiles.html" },
+  { name:"Transport Equipment", teaser:"The fastest-growing large sector on the official output index.", desc:"The fastest-growing large manufacturing sector on the official output index, with steadily strengthening firm financials.", href:"transport_equipment.html" },
+  { name:"Food and Agro", teaser:"The country's largest factory base by count.", desc:"Agro-processing and packaged food manufacturing — the highest factory count of any sector, with output outrunning value capture.", href:"food-and-agro.html" },
+  { name:"Chemicals", teaser:"Industrial and specialty chemicals, pharma included.", desc:"Industrial and specialty chemicals manufacturing, now including pharmaceuticals within the sector definition.", href:"chemicals.html" },
+  { name:"Electronics", teaser:"Consumer and industrial electronics manufacturing.", desc:"Consumer and industrial electronics manufacturing, a sector defined by import dependence and assembly-led growth.", href:"electronics.html" },
+  { name:"Electrical Equipment", teaser:"Power equipment, motors and electrical machinery.", desc:"Power equipment, motors, and electrical machinery — a capital-goods backbone sector for the wider economy.", href:"electrical_equipment.html" },
+  { name:"Engineering Goods", teaser:"Capital goods, machinery and engineering exports.", desc:"Capital goods, machinery, and engineering exports, spanning a wide and diversified base of intermediate manufacturers.", href:"engineering_goods.html" },
+  { name:"Metals", teaser:"Ferrous and non-ferrous production and processing.", desc:"Ferrous and non-ferrous metal production and processing, a commodity-cyclical sector with heavy capital intensity.", href:"metals.html" },
+  { name:"Construction Materials", teaser:"Cement, ceramics, glass and building materials.", desc:"Cement, ceramics, glass and building materials manufacturing, tracking closely with the domestic construction cycle.", href:"construction_materials.html" },
+  { name:"Leather and Related Products", teaser:"Leather goods, footwear and allied manufacturing.", desc:"Leather goods, footwear and allied manufacturing — a labour-intensive, export-oriented sector under sustained pressure.", href:"leather.html" }
+];
+
+function cardHTML(s, i){
+  const num = i+1;
+  return `
+    <a class="card-flip" href="${s.href}" aria-label="Open ${s.name} snapshot">
+      <div class="card-inner">
+        <div class="face face-front">
+          <p class="tag">Sector ${num} of 10</p>
+          <h3>${s.name}</h3>
+          <div class="rule"></div>
+          <p class="teaser">${s.teaser}</p>
+          <p class="cont">Continued inside →</p>
+        </div>
+        <div class="face face-back">
+          <div>
+            <p class="tag">Sector ${num} of 10</p>
+            <p>${s.desc}</p>
+          </div>
+          <span class="go">Open snapshot</span>
+        </div>
+      </div>
+    </a>
+  `;
+}
+
+document.getElementById("grid").innerHTML = SECTORS.map((s,i)=>cardHTML(s,i)).join("");
+</script>
+
+</body>
+</html>

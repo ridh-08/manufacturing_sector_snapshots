@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Construction Materials: Scale Without Fragility — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .block-note-wide{font-size:17px;line-height:1.68;opacity:.78;margin:0 0 18px;max-width:1040px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Construction Materials Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Construction Materials",
+    tagline: "Cement, glass, ceramics, wood and furniture (NIC Div 16, 23, 31): the strongest IIP performer of any sector in this series after Metals, built on steady factory growth and a firm structure that has stayed competitive, but now running a trade deficit for the first time.",
+    stats: [
+      {n:"37,298", l:"factories (2023-24)"},
+      {n:"₹6.22 L cr", l:"gross value of output"},
+      {n:"−₹22,063 cr", l:"trade deficit, FY24-25"},
+      {n:"2 / 11", l:"IIP level rank"},
+      {n:"+6.57%", l:"latest IIP growth, 2025-26"},
+      {n:"30.4%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "Steady factory growth, a firm structure that has stayed competitive with a mild recent rise in concentration",
+    subhead: "Construction Materials (cement, glass, ceramics, wood products and furniture) has grown its factory base and output steadily for a decade. On a full-firm-universe basis, concentration has risen modestly but stayed well inside the Competitive band throughout.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, NIC Div 16 + 23 + 31, 2023-24.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","37,298"],
+        ["Factories in operation","30,690"],
+        ["Total persons engaged","13.90 lakh"],
+        ["Gross Value of Output, 2023-24","₹6.22 lakh crore"],
+        ["Gross Value Added, 2023-24","₹1.36 lakh crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [2.67,2.56,2.94,3.23,3.87,3.79,3.70,4.69,5.45,6.22],
+      lineValues: [24.6,25.0,26.0,26.3,24.4,24.6,25.7,23.4,20.5,21.9],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO rose 133% over the decade (₹2.67 lakh crore to ₹6.22 lakh crore, national ASI totals), with the sharpest single-year jump in 2021-22. The value-added share of that output drifted down from 24.6% (2014-15) to 21.9% (2023-24), with a low of 20.5% in 2022-23 — a milder version of the pattern seen in Chemicals and Electronics: materials consumed as a share of GVO rose from 42.1% (2014-15) to 48.4% (2023-24) over the same series, consistent with rising input-cost pass-through rather than a structural collapse in value capture."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [33150,33576,34262,34874,35913,36255,36673,36597,36432,37298]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [348.3,358.6,344.4,356.8,390.7,417.1,433.9,414.7,429.3,455.2,504.5],
+      band: "Competitive band is HHI < 1,500 — Construction Materials sits comfortably inside it throughout the decade, with a gradual rise from 348.3 (2014-15) to 504.5 (2024-25) rather than the sharp de-concentration a top-firm-sample HHI previously suggested. This HHI is computed directly from every firm reporting positive Revenue From Operations in the sector's Prowess export each year (331 to 411 firms depending on the year, not a fixed top-firm sample), so it is not comparable to the top-firm-sample HHI shown on this page previously (which ran roughly 920-1,770 on a much narrower base, including an unreliable single-firm 2014-15 reading that had to be excluded outright). Top-3 firm share on this same full-universe basis rose from 25.3% (2014-15) to 30.4% (2024-25); the number of firms reporting usable revenue fell steadily over the same period, from 405 to 331, consistent with the churn pattern below rather than a data artefact."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (national aggregate)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [0.998,0.908,0.946,0.942,0.876,0.951,0.985,0.852,0.810,0.832,0.946],
+      band: "Moderate band is 0.5×–1.5× — Construction Materials sits consistently in the middle-to-upper part of that band across the whole decade (0.81×–1.00×), reflecting the genuinely fixed-asset-heavy nature of cement kilns, glass furnaces and ceramics plants. Unlike the earlier draft of this paper, this is now sourced from corrected Gross Fixed Assets and Sales figures confirmed directly from the underlying CMIE Industry Outlook sheet."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      valueSuffix: "%",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [25.18,6.14,15.07,53.61],
+      caption: "Power & fuel (15.07% of sales) is the standout line for this sector, well above what most other manufacturing sectors in this series report, consistent with cement and glass production being energy-intensive by nature. The residual 'Other / margin' band (53.61%) includes royalty & technical know-how fees (0.55% of sales), overheads, and PAT margin (5.71% of total income in 2024-25)."
+    },
+    firmTable: {
+      note: "Top 5 firms by 2024-25 revenue (single-year basis, superseding the previous 3-year-average PAT-margin-ranked presentation). Source: Prowess IQ, 2026 pull, construction_materials_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. Export Intensity is reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero — this is the case for all five firms below.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["Ultratech Cement Ltd.","Cement","71,895","8.61%","0.021%","—"],
+        ["Asian Paints Ltd.","Paints & coatings","29,553","12.14%","0.415%","—"],
+        ["A C C Ltd.","Cement","21,668","11.19%","0.005%","—"],
+        ["Ambuja Cements Ltd.","Cement","19,454","14.57%","—","—"],
+        ["Shree Cement Ltd.","Cement","18,037","6.63%","0.079%","—"]
+      ]
+    },
+    firmConcNote: "Concentration has risen modestly, not fallen sharply. Computed from the full firm universe reporting revenue each year (see chart above), sector HHI stood at 504.5 in 2024-25, up from 348.3 in 2014-15, but comfortably inside the 'Competitive' band throughout. The top-3 firms' combined share on this same full-universe basis was 30.4% in 2024-25 — a materially different figure from the top-firm-sample measure previously shown on this page, because the denominator here is the sector's entire reporting population (331 firms in 2024-25), not a fixed shortlist. On this same full-universe methodology, Construction Materials (HHI 504.5) remains more concentrated than Transport Equipment (HHI 208.4) but less concentrated than Chemicals (HHI 779.0) as of 2024-25. Four of the top five firms by revenue are cement producers; Ambuja Cements' R&D field is blank at source. None of the top five report a non-blank export-intensity figure at source. The firms that actually lead the sector on R&D and export value and intensity are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, construction_materials_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["Asian Paints Ltd.","122.76"],
+        ["Kansai Nerolac Paints Ltd.","49.62"],
+        ["Himadri Speciality Chemical Ltd.","35.88"],
+        ["P P G Asian Paints Pvt. Ltd.","34.06"],
+        ["Carborundum Universal Ltd.","25.60"]
+      ]
+    },
+    rndByValueNote: "By absolute spend, paints and coatings firms dominate the top of the list (Asian Paints, Kansai Nerolac, P P G Asian Paints), consistent with Asian Paints' 0.415% R&D intensity in the firm table above, the highest of any top-5-by-revenue firm. Only P P G Asian Paints Pvt. Ltd. also appears on the R&D intensity-leaders list below; the other four value leaders are large firms whose R&D spend is high in absolute terms without being a large share of their own sales.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25. Source: Prowess IQ, 2026 pull, construction_materials_rnd_leaders.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Asian Paints Indl. Coatings Ltd.","1.90","23.44","8.11%"],
+        ["P P G Asian Paints Pvt. Ltd.","34.06","2,081.98","1.64%"],
+        ["Shalimar Paints Ltd.","6.70","599.06","1.12%"],
+        ["Elantas Beck India Ltd.","8.03","748.51","1.07%"],
+        ["Carborundum Universal Ltd.","25.60","2,827.58","0.91%"]
+      ]
+    },
+    rndLeadersNote: "R&D intensity in Construction Materials tops out at 8.11% (Asian Paints Indl. Coatings), well short of the double-digit intensities seen in sectors like Chemicals, but still clears the Institute's 'Leader' band (>3%) for the top firm; the remaining four sit in the 0.9%-1.7% range, closer to 'laggard' territory. All five are paints, coatings or abrasives specialists rather than the cement majors that dominate the sector by revenue.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, construction_materials_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Aro Granite Inds. Ltd.","10,889.98"],
+        ["Greenlam Industries Ltd.","763.52"],
+        ["Carborundum Universal Ltd.","755.76"],
+        ["Patton International Ltd.","642.99"],
+        ["I F G L Refractories Ltd.","254.52"]
+      ]
+    },
+    exportByValueNote: "Aro Granite Inds. Ltd. leads absolute export value by a very wide margin (₹10,890 crore, more than 14x the second-place firm), but its own export-intensity ratio is a source data error and has been excluded from the intensity table below (see note there) — its export value here is retained as plausible on its own, only the paired revenue figure is unreliable. Patton International Ltd. is the only firm to appear on both the by-value and by-intensity export lists.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25, source Prowess IQ, 2026 pull, construction_materials_export_leaders. One firm in the source list, Aro Granite Inds. Ltd. (reported exports of ₹1,08,900 mn against reported revenue of just ₹1,231 mn, an implausible 8,847% ratio), has been excluded as a source data error rather than a real intensity figure; it should be re-verified against Prowess directly before being cited. The four rows below are the remaining, plausible entries.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Madhav Marbles & Granites Ltd.","29.86","30.95","96.48%"],
+        ["Tab India Granites Pvt. Ltd.","208.74","230.06","90.73%"],
+        ["Patton International Ltd.","642.99","780.21","82.41%"],
+        ["Velvin Packaging Solutions Pvt. Ltd.","152.08","205.47","74.01%"]
+      ]
+    },
+    exportLeadersNote: "Patton International Ltd. is the only firm to appear on both the by-value and by-intensity export lists — the fourth-largest exporter by value and also 82.41% export-intensive, an export-led business rather than a domestic one with an export sideline. The other three plausible intensity leaders (Madhav Marbles & Granites, Tab India Granites, Velvin Packaging) are smaller, near-fully export-oriented granite and packaging specialists that don't rank among the top absolute exporters.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 446 firms reporting in the sector in 2014-15, 104 have stopped reporting entirely and a further 25 are dormant (reporting but with negligible or zero activity), leaving 317 still active. Combined churn (stopped-reporting plus dormant) is 129 firms, or 28.9% of the original 2014-15 universe — a relatively high churn rate among the sectors in this series. This 446-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year), which is why the two firm counts for FY2014-15 differ (446 vs 405)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "The second-strongest IIP performer of eleven sectors",
+    subhead: "Construction Materials ranks 2nd of 11 sectors on IIP level and 3rd on full-period CAGR, behind only Metals on both measures. Firm-level financials have improved more modestly than the output index would suggest, and one widely-used aggregate ratio is unreliable at source for this sector.",
+    iipChart: {
+      title: "IIP index, Construction Materials, 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [102.9,103.4,107.8,111.6,111.3,115.6,125.7,123.5,106.2,127.5,136.1,143.5,150.8,160.7],
+      annotations: [
+        {index:6, label:"125.7 (pre-COVID peak)", color:"var(--thread-turmeric)"},
+        {index:8, label:"106.2 (COVID)", color:"var(--thread-madder)"},
+        {index:13, label:"160.7 (all-time high, latest)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[3.42,6.45,5.47,5.71]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[5.61,9.85,8.70,6.27]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Construction Materials — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2022-23"],
+      rows: [
+        ["Workers per factory","27.8","27.5","28.2"],
+        ["Wages per worker (₹)","95,762","1,53,024","1,64,070"],
+        ["Output per worker (₹)","28,97,592","46,62,441","52,98,193"],
+        ["Productivity-wage ratio","4.67","5.23","4.72"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","3.4%","5.7%"],
+        ["ROE %","5.6%","6.3%"],
+        ["ROA %","2.2%","3.5%"],
+        ["ROCE %","9.4%","11.3%"],
+        ["Debt-to-Equity (×)","0.90","0.32"],
+        ["Interest Cover (×)","1.88","3.72"],
+        ["Current Ratio","1.03","1.23"],
+        ["Free Cash Flow (₹ mn)","63,875","48,260"]
+      ]
+    },
+    rocNote: "ROCE = (PBDITA − Depreciation) ÷ Capital Employed, per this project's standard derivation (CMIE has no EBIT-based ROCE line). Gross Fixed Assets and Capital Employed were initially misread from a stale/corrupted copy of the Industry Outlook sheet (small ratio-like values instead of Rs. million); both Capital Intensity above and ROCE here have been corrected against the confirmed source figures (GFA: ₹22,785.9 cr in 2014-15 to ₹43,358.3 cr in 2024-25; Capital Employed: ₹24,764.6 cr to ₹45,235.7 cr over the same period).",
+    fcfNote: "Free Cash Flow has not improved steadily: it peaked at ₹4,14,838 million in 2020-21 (a low-capex COVID year) before falling back to ₹48,260 million in 2024-25 as Purchase of Fixed Assets rose to ₹4,00,002 million, the highest capex outlay of the decade.",
+    rndFlag: "R&D spend has held near 0.08%–0.10% of sales across the decade (0.081% in 2024-25) — a clear 'laggard' by the Institute's thresholds (Leader >3%, Active 1–3%, Laggard <1%), broadly flat rather than trending in either direction, consistent with a sector whose competitiveness runs through scale, energy cost management, and logistics rather than in-house R&D.",
+    narrative: "Construction Materials tracked close to the overall manufacturing index through the mid-2010s, then pulled ahead from 2017-18 as housing and infrastructure demand accelerated, before a 15.5-point COVID-year fall in 2020-21. Recovery since has been the second-strongest of any sector in this series, behind only Metals: the index has set a new high every year since 2021-22 and now sits at an all-time high of 160.7, some 27.9% above the 2018-19 pre-COVID peak. Financial performance of tracked firms improved from 2014-15 to the COVID-era peak (PAT margin 3.4%→6.5% by 2019-20) but has since eased back to 5.7% by 2024-25, and ROE has fallen from a 2021-22 high back to 6.3% — a more uneven financial trajectory than the output index alone would suggest, and a reminder that a strong IIP reading does not automatically translate into equally strong firm-level returns."
+  },
+
+  trade: {
+    eyebrow: "03 — Trade",
+    title: "A persistent, and now widening, trade deficit",
+    subhead: "Construction Materials has run a deficit in five of the last seven years, including every year since 2021-22. FY24-25 saw that deficit widen sharply as import growth (16.7% YoY) sharply outpaced a small export contraction (−0.9% YoY), and provisional FY25-26 figures show it widening further still.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[58107,67178,79605,84092,89258,88463,93972]},
+        {name:"Imports", color:"var(--thread-madder)", values:[60066,51884,75977,94949,94674,110526,128269]}
+      ]
+    },
+    tradeStats: [
+      {n:"₹88,463 cr", l:"exports, FY24-25"},
+      {n:"₹1,10,526 cr", l:"imports, FY24-25"},
+      {n:"−₹22,063 cr", l:"trade balance, FY24-25 — deficit"},
+      {n:"−0.9%", l:"export growth, FY24-25"},
+      {n:"+16.7%", l:"import growth, FY24-25"},
+      {n:"55.5%", l:"import dependency"},
+      {n:"8.8%", l:"export 5-year CAGR"},
+      {n:"13.0%", l:"import 5-year CAGR — outpacing exports"}
+    ],
+    caveatNote: "Figures in this section are directional rather than exact — the underlying HS-to-NIC concordance maps a majority but not all of trade value to a sector; the remainder is unclassified and excluded rather than estimated.",
+    partnersTable:{
+      note: "Top partners by value, FY24-25",
+      cols:["#","Export partner (₹ cr)","Import partner (₹ cr)"],
+      rows:[
+        [1,"USA — 21,769","China — 27,755"],
+        [2,"China — 7,170","UAE — 8,920"],
+        [3,"UAE — 4,896","USA — 3,511"],
+        [4,"UK — 3,301","Russia — 1,526"],
+        [5,"Germany — 2,592","Hong Kong — 433"]
+      ]
+    },
+    productsTable:{
+      note: "Top traded products by value, FY24-25. HS-code level.",
+      cols:["#","Export product (₹ cr)","Import product (₹ cr)"],
+      rows:[
+        [1,"Ceramic products, water absorption ≤0.5% — 15,269","Natural calcium phosphates, ungrouund — 9,681"],
+        [2,"Granite, simply cut/sawn with flat surface — 6,350","Ground natural calcium phosphates — 6,715"],
+        [3,"Other wooden furniture — 5,819","Limestone flux (for cement/lime manufacture) — 6,042"],
+        [4,"Salt (incl. table salt, denatured salt) — 3,796","Toughened (tempered) safety glass — 5,476"],
+        [5,"Other articles for conveyance/packing of goods — 3,489","Pine timber, smallest cross-section ≥15cm — 3,018"]
+      ]
+    },
+    tradeNote: "China is the dominant single import partner (₹27,755 crore, more than triple the #2 partner) — notable given cement, glass and ceramics are typically viewed as domestically-produced, bulky, transport-cost-sensitive goods; the import side is concentrated in raw mineral inputs (natural calcium phosphates, limestone flux) rather than finished construction materials, a different pattern from the finished-goods deficits seen in Electronics."
+  },
+
+  investment: {
+    eyebrow: "04 — Investment & PLI",
+    title: "A private-sector pipeline, and no PLI scheme covering this sector",
+    subhead: "New investment is overwhelmingly private, and the latest year shows a sharp rise in dropped projects alongside record new investment announced. No Production Linked Incentive scheme applies to this sector's NIC scope.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[23068,33402,72622]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[27951,9915,40017]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE CapEx database. All figures converted from Rs. million to Rs. crore.",
+      cols:["Indicator","Value"],
+      rows:[
+        ["Total investment outstanding","₹3,05,406 cr (306 projects)"],
+        ["Under implementation","₹1,01,263 cr (116 projects)"],
+        ["Implementation stalled","₹24,250 cr (23 projects)"],
+        ["Investments completed","₹13,807 cr (28 projects), down from ₹14,739 cr in 2023-24"],
+        ["New investments announced","₹72,622 cr (63 projects), up sharply from ₹64,507 cr in 2023-24"]
+      ]
+    },
+    dropFlag:"Dropped-investment cost more than doubled in 2024-25 (₹18,222 cr in 2023-24 to ₹40,017 cr, 69 projects) even as new investment announced also hit a decade high (₹72,622 cr) — both the pipeline and the drop-out rate are expanding together, a pattern worth watching rather than a simple one-directional signal.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore). State order follows this sector's actual ASI GVO ranking (Gujarat, Rajasthan, Maharashtra), not a fixed template ordering.",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Gujarat","18,879","20,320","25,038"],
+        ["Rajasthan","34,447","39,732","40,371"],
+        ["Maharashtra","5,136","7,656","13,045"]
+      ]
+    },
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[0,0,72483,139]
+    },
+    ownershipNote:"Indian Private Sector dominates new investment almost totally (₹72,483 crore of the ₹72,622 crore total, roughly 99.8%); Foreign Private investment is negligible (₹139 crore) and government investment (Central + State) has not registered a value in this indicator since the mid-2010s.",
+    pliNote:"No Production Linked Incentive scheme covers this sector's NIC scope (Division 16 wood products, 23 non-metallic mineral products including cement/glass/ceramics, and 31 furniture). The PLI schemes most often associated with 'construction materials' in public discussion, Specialty Steel and construction equipment, sit under this project's Metals and Engineering Goods / Transport Equipment sector definitions respectively, not here. This section is included per the template's 'PLI where applicable' rule to record that finding explicitly rather than leave it silently blank.",
+    fdiNote:"A dedicated FDI figure for this project's combined Construction Materials definition (NIC 16, 23, 31) was not available in the sources reviewed for this paper and is flagged as a data gap rather than estimated; DPIIT publishes FDI by narrower categories (Cement and Gypsum Products; Glass) that do not map cleanly to this project's NIC-based sector definition without further reconciliation.",
+    insightBox:"Construction Materials is, on the investment data, a private-capital, no-policy-subsidy story: the pipeline is large, growing, and almost entirely Indian-private-funded, with no PLI layer of the kind that shapes the investment narrative in Chemicals (pharma-only PLI), Electronics, or Transport Equipment. R&D spend (0.081% of sales) is flat and low, consistent with a sector competing on scale and energy-cost management rather than product innovation or policy-driven capacity build-out."
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Gujarat's scale, Rajasthan's mineral base",
+    subhead: "Gujarat leads by a wide margin, with Rajasthan a clear second, reflecting the state's limestone and marble/sandstone reserves that anchor its cement and stone-products base. Karnataka and Andhra Pradesh trail closely behind Tamil Nadu for the remaining top-5 spots.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Gujarat","Rajasthan","Maharashtra","Tamil Nadu","Andhra Pradesh"],
+      values:[115587,73085,52957,46039,42324]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5",
+      xLabel:"State", yLabel:"% of national GVO",
+      valueSuffix: "%",
+      labels:["Gujarat","Rajasthan","Maharashtra","Tamil Nadu","Andhra Pradesh"],
+      values:[18.59,11.76,8.52,7.41,6.81]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Gujarat","Rajasthan","Maharashtra","Tamil Nadu","Andhra Pradesh"],
+      values:[199180,182127,198628,197553,209534]
+    },
+    stateTable:{
+      note:"Top-5 states by GVO share, ASI 2023-24 (latest available)",
+      cols:["State","Factories","GVO share","Persons engaged","Wages/worker"],
+      rows:[
+        ["Gujarat","4,124","18.6%","1,95,444","₹1,99,180"],
+        ["Rajasthan","3,371","11.8%","1,37,262","₹1,82,127"],
+        ["Maharashtra","1,311","8.5%","91,737","₹1,98,628"],
+        ["Tamil Nadu","2,960","7.4%","1,21,692","₹1,97,553"],
+        ["Andhra Pradesh","4,946","6.8%","87,265","₹2,09,534"]
+      ]
+    },
+    flag:"Top-5 states account for ~53% of national GVO, a less concentrated geography than most other sectors in this series (Textiles ~65%, Transport Equipment ~75.5%), consistent with a sector whose core inputs (limestone, clay, sand, timber) are found across many states rather than a small number of specialised hubs. Andhra Pradesh has by far the highest factory count of the top-5 (4,946, nearly as many as Gujarat) but the lowest GVO share among them, pointing to a larger number of smaller-scale operations — plausibly the state's many small brick, tile and stone-crushing units — rather than a concentration of large plants."
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Three registered clusters, spanning ceramics, refractories and brick-making",
+    subhead: "Construction Materials' cluster register is thinner than most other sectors in this series — three entries rather than five or more — but each is a real, named, single-product cluster rather than a broad aggregation, and one (Morbi) is among the best-known manufacturing clusters in India by reputation even though it carries only a single-line profile here.",
+    clusterChips:[
+      "Morbi Cluster (Ceramics), Gujarat — ~450 MSMEs",
+      "Asansol-Burnpur Refractory Industries, West Bengal — 206 units",
+      "Maharashtra Clay Fired Brick Making Clusters — ~17,000 kilns"
+    ],
+    clusterTable:{
+      note:"Registered Construction Materials clusters. Source: SAMEEEKSHA cluster profiles.",
+      cols:["Cluster","State","Units (est.)","Anchor / major firms","Principal products","Export orientation"],
+      rows:[
+        ["Morbi Cluster (Ceramics)","Gujarat","~450 MSMEs, ~₹10,000 crore turnover","—","Wall tiles, floor tiles, vitrified tiles, sanitary ware","No"],
+        ["Asansol-Burnpur Refractory Industries","West Bengal","206 refractory units, mixed scale","Durgapur Steel Plant, Hindustan Cables Ltd., Chittaranjan Locomotives (anchor customers, not cluster firms)","Refractory blocks and bricks, graphite stopper heads, insulation bricks, ladles, refractory mortar, ramming mass, silica brick","Unknown"],
+        ["Maharashtra Clay Fired Brick Making Clusters","Maharashtra","~17,000 kilns, ~28 billion bricks produced/year","Maharashtra Brick Kiln Manufacturers Association","Solid clay-fired bricks","Not applicable (domestic construction input)"]
+      ]
+    },
+    note:"Morbi's scale (~450 MSMEs) is consistent with Gujarat's dominant 18.6% share of national GVO in the Geography section, but the cluster is explicitly export-orientation 'No' in the source profile, meaning Gujarat's GVO lead is a domestic-market story here, not an export one, a contrast with clusters like Tiruppur (Textiles) or Sriperumbudur (Electronics) that are built around export orientation. The Maharashtra brick-kiln cluster is reported by kiln count and physical output (bricks/year) rather than turnover, a different metric shape from the other two clusters and from most cluster entries elsewhere in this series; it is retained as-is rather than converted to an estimated turnover figure.",
+    noteD:"Asansol-Burnpur's listed 'anchor firms' (Durgapur Steel Plant, Hindustan Cables, Chittaranjan Locomotives) are large industrial buyers of refractory products, not refractory producers themselves; they are recorded here as the demand anchors that justify the cluster's location, following the source profile's own framing, not as manufacturing units within the cluster.",
+    noteE:"This cluster set is shorter than most other sectors in this series (three entries against five or more elsewhere) and should be read as an incomplete register rather than an exhaustive one: known concentrations exist elsewhere in this sector (for example, the Rajasthan marble and sandstone belt implied by that state's GVO and factory-count figures in the Geography section) that are not yet captured as named, sourced cluster profiles."
+  }
+};
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "The strongest output story after Metals, with a deficit that keeps widening",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Construction Materials stands today.",
+  sections: [
+    { h: "The core story: the second-strongest output performer of eleven sectors", p: [
+      "Construction Materials ranks 2nd of 11 sectors on IIP level (160.7 in 2025-26, up from a 2012-13 base of 102.9) and 3rd on full-period CAGR (3.49%), behind only Metals on both measures. Factories grew from 33,150 to 37,298 (2014-15 to 2023-24), and Gross Value of Output rose 133%, from ₹2.67 lakh crore to ₹6.22 lakh crore, national ASI totals. The sector's firm structure, measured on a full-firm-universe basis, has risen modestly in concentration but stayed comfortably inside the 'Competitive' band throughout: HHI rose from 348.3 (2014-15) to 504.5 (2024-25), still less concentrated than Chemicals (HHI 779.0) though more concentrated than Transport Equipment (HHI 208.4) on the same full-universe methodology as of 2024-25.",
+      "That output strength has not translated into an equally strong or steady firm-financial story. PAT margin for tracked firms rose from 3.4% (2014-15) to a COVID-era high of 6.5% (2019-20) before easing back to 5.7% by 2024-25, and ROE similarly peaked in 2021-22 before falling to 6.3%. ROCE tells a steadier story, rising from 9.4% to 11.3% over the decade, and Capital Intensity has held consistently in the 0.81×–1.00× range throughout, reflecting the genuinely fixed-asset-heavy nature of cement kilns and glass furnaces. Free Cash Flow, meanwhile, peaked during the low-capex COVID year (2020-21) and has since fallen as capital expenditure has risen. This is a sector where the output index and firm-level returns are telling somewhat different stories, unlike Transport Equipment, where both point the same direction, or Textiles, where both diverge in the same downward direction."
+    ]},
+    { h: "Trade: a deficit that has been building for years and is now widening sharply", p: [
+      "Unlike Textiles or Transport Equipment, Construction Materials is not a net export sector. It has run a trade deficit in five of the last seven years, including every year since 2021-22, and that deficit widened sharply in FY24-25 to ₹22,063 crore as imports grew 16.7% year-on-year against a 0.9% export contraction. Import dependency stands at 55.5%. China is the dominant import partner by a wide margin (₹27,755 crore, more than triple the next partner), though the specific products driving that import bill, natural calcium phosphates and limestone flux, are raw mineral inputs rather than finished construction materials, a different signature from the finished-goods import pattern seen in Electronics. Provisional FY25-26 figures show the deficit widening further still."
+    ]},
+    { h: "Investment: an entirely private-capital story, with no PLI layer", p: [
+      "New investment in Construction Materials is almost completely private-sector-funded: Indian Private Sector investment reached ₹72,483 crore in 2024-25, essentially the sector's entire ₹72,622 crore new-investment total, with Foreign Private negligible (₹139 crore) and government investment not registering a value in this indicator in recent years. Unlike Chemicals, Electronics, or Transport Equipment, no Production Linked Incentive scheme covers this sector's NIC scope (wood products, non-metallic mineral products including cement/glass/ceramics, and furniture) — a finding worth stating plainly rather than leaving unaddressed. The investment pipeline shows both new investment and dropped-project value rising together in 2024-25 (announced investment at a decade high of ₹72,622 crore, dropped investment more than doubling to ₹40,017 crore), a pattern that bears watching rather than a simple one-directional signal."
+    ]},
+    { h: "Geography: Gujarat's scale, Rajasthan's mineral base, a less concentrated map than most sectors", p: [
+      "Gujarat leads by a wide margin (18.6% of national GVO, ₹1,15,587 crore), with Rajasthan a clear second (11.8%, ₹73,085 crore) — a pairing that reflects the two states' limestone, marble and sandstone reserves underpinning cement and dimension-stone production. Maharashtra, Tamil Nadu and Andhra Pradesh round out the top five, each in the 6.8-8.5% range. The top-5 states together account for only around 53% of national output, a notably less concentrated geography than Textiles (~65%) or Transport Equipment (~75.5%), consistent with a sector whose core mineral and timber inputs are more widely distributed across the country. Andhra Pradesh stands out for having nearly as many factories as Gujarat (4,946 vs 4,124) while capturing the smallest GVO share of the top five, suggesting a larger number of smaller-scale operations rather than a concentration of large plants."
+    ]},
+    { h: "Clusters: a thin but real register, three named single-product hubs", p: [
+      "Construction Materials' cluster register is shorter than most other sectors in this series, three entries against five or more elsewhere, but each is a specific, sourced, single-product cluster: Morbi in Gujarat (~450 MSMEs, ceramics and vitrified tiles), Asansol-Burnpur in West Bengal (206 refractory-product units serving Durgapur Steel Plant and other large industrial buyers), and a Maharashtra-wide network of roughly 17,000 clay-fired brick kilns producing an estimated 28 billion bricks a year. Morbi's export orientation is explicitly recorded as 'No' in the source profile, meaning Gujarat's dominant GVO share (18.6% of the national total, see Geography) reflects a domestic-market cluster rather than an export-facing one, a contrast with export-oriented clusters like Tiruppur or Sriperumbudur seen in other sectors. Known concentrations elsewhere in this sector, notably the Rajasthan marble and sandstone belt implied by that state's GVO and factory-count figures, are not yet captured as named, sourced cluster profiles and remain a gap for future data collection."
+    ]},
+    { h: "R&D: a low, flat laggard", p: [
+      "R&D spend as a share of sales has held in a narrow 0.08%-0.10% band across the entire decade, closing at 0.081% in 2024-25 — squarely in the 'laggard' band (below 1%) with no meaningful upward or downward trend. This is consistent with a sector whose competitiveness runs through scale economies, energy-cost management (power & fuel is 15.07% of sales, the highest cost-structure line of any sector reviewed in this series after raw materials), and logistics, rather than product innovation."
+    ]}
+  ],
+  summary: [
+    {n:"+133%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"160.7", l:"IIP index, all-time high, 2025-26 (2nd of 11 sectors)"},
+    {n:"0.081%", l:"R&D spend, share of sales, flat for a decade"},
+    {n:"−₹22,063 cr", l:"trade deficit, FY24-25, widening"},
+    {n:"9.4%→11.3%", l:"ROCE, 2014-15 → 2024-25"}
+  ],
+  takeaway: "Construction Materials is the second-strongest output performer in this eleven-sector series, with steady factory growth, a firm structure that has stayed comfortably competitive even as concentration has risen modestly, and capital returns (ROCE 9.4%→11.3%) that have improved steadily even where margin-based returns have not. That headline strength sits alongside real open questions: PAT margin and ROE have eased back since a COVID-era peak even as ROCE improved, the sector's trade position has slipped into a persistent and now widening deficit, there is no PLI scheme covering this sector's NIC scope, and its cluster register is thinner than most other sectors in this series. None of these undercut the output growth story, but they are the areas the next phase of data collection and policy attention should address.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, NIC Div 16, 23, 31, 2014-15 to 2023-24.",
+    "Index of Industrial Production, corrected 11-sector composite, Ministry of Statistics and Programme Implementation.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, firm-level panel by sector.",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates, FY14-15 to FY24-25, and CapEx Investment Pipeline database.",
+    "Cluster Supply Chain Linkage Workbook, Institute of Manufacturing and Economy internal registry (no entries found for this sector; see Clusters section note)."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to a small documented residual against the official total; this does not affect this sector's own index level or growth figures."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures maps a majority but not all of trade value to a sector; the unclassified remainder is excluded rather than estimated. Treat trade figures as directional rather than exact."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"Capital Intensity and ROCE were initially omitted after an early read of the Gross Fixed Assets and Capital Employed rows returned small ratio-like values rather than Rs. million figures. This was traced to a stale or corrupted copy of the Industry Outlook sheet; the confirmed source figures (GFA and Capital Employed in the ordinary Rs. million range, consistent with Sales) were verified directly and both ratios are reported in this version."},
+    {tag:"(e)", text:"No Production Linked Incentive scheme was found to cover this sector's NIC scope (Division 16 wood products, 23 non-metallic mineral products, 31 furniture). The Specialty Steel PLI scheme, sometimes associated with 'construction materials' in general discussion, is scoped to this project's Metals sector definition (NIC 24), not here."},
+    {tag:"(f)", text:"The cluster register for this sector carries three entries (Morbi ceramics, Asansol-Burnpur refractories, Maharashtra clay-fired brick kilns), fewer than most other sectors in this series. This is treated as an incomplete rather than exhaustive register; known concentrations such as the Rajasthan marble and sandstone belt are not yet captured as named, sourced profiles."},
+    {tag:"(g)", text:"Firm-level Sales and Capital Intensity figures from the India_Mfg_Analysis workbook are excluded from the Scale section's firm table per this project's data-quality rule restricting that file to HHI/concentration figures only; only firm names and PAT margin are shown, sourced from the same firm-scorecard tab."},
+    {tag:"(h)", text:"A dedicated FDI figure for this project's combined NIC 16+23+31 sector definition was not available in the sources reviewed and is flagged as a data gap rather than estimated."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · NIC Divisions 16, 23, 31 · Primary Research: To be asked · Compiled by: Riddhi Bhargava"
+};
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+/* Value labels on bars/points must stay compact but exact-ish; short-form
+   for big absolute figures, one-decimal for anything under 1000. */
+function fmtVal(v){
+  if(Math.abs(v)>=1000) return fmtShort(v);
+  if(Number.isInteger(v)) return v.toString();
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  const multi = series.length>1;
+  series.forEach((ser,si)=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`;
+      const above = multi ? (si%2===0) : true;
+      const ly = above ? y-12 : y+20;
+      s+=`<text class="value-label" x="${x}" y="${ly}" text-anchor="middle" fill="${ser.color}">${fmtVal(v)}</text>`;
+    });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<text class="bar-value-label" x="${cx}" y="${y-10}" text-anchor="middle">${fmtVal(v)}${cfg.valueSuffix||''}</text>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <p class="cc-eyebrow">Construction Materials Sector Snapshot</p>
+      <h1 class="cc-title">${c.title}</h1>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <p class="block-note">${d.rocNote}</p>
+    <div class="grid2" style="margin-top:32px"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">0.081%</div><div class="rnd-label">of sales — R&D spend, flat for a decade</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.tradeStats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <div style="margin-top:26px">${table(d.partnersTable)}</div></div></div>
+    <div class="grid1">${table(d.productsTable)}</div>
+    <div class="grid1"><p class="narrative" style="font-size:18px">${d.tradeNote}</p></div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <p class="block-title">Registered clusters</p>
+    <div class="chip-row">${d.clusterChips.map(c=>`<div class="chip">${c}</div>`).join("")}</div>
+    <div class="grid1" style="margin-top:30px">${table(d.clusterTable)}</div>
+    <div class="flag" style="margin-top:20px">${d.note}</div>
+    <p class="block-note" style="margin-top:16px"><b>Note (d):</b> ${d.noteD}</p>
+    <p class="block-note" style="margin-top:8px"><b>Note (e):</b> ${d.noteE}</p>
+    </div>`;
+}
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Construction Materials Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>

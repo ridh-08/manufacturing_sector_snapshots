@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electronics: Assembly Boom, Value Gap — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .block-note-wide{font-size:17px;line-height:1.68;opacity:.78;margin:0 0 18px;max-width:1040px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Electronics Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Electronics",
+    tagline: "India's fastest-scaling manufacturing story of the last decade, built overwhelmingly on final assembly — output has surged, but the sector runs a widening trade deficit and imports over 70% of what it consumes.",
+    stats: [
+      {n:"2,516", l:"factories (2023-24)"},
+      {n:"₹52.4 L cr", l:"gross value of output"},
+      {n:"−₹4.64 L cr", l:"trade deficit, FY24-25"},
+      {n:"5 / 11", l:"IIP level rank"},
+      {n:"6.9%", l:"latest IIP growth, 2025-26"},
+      {n:"37.5%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "Fast-growing factory count, gradually de-concentrating at the top",
+    subhead: "Factory count and output both roughly doubled in a decade. On a full-firm-universe basis, the firm structure has stayed inside the Competitive band throughout, but has genuinely de-concentrated further within it — HHI fell from a 2019-20 peak of 933.5 to 627.5 by 2024-25 as PLI-era entrants scaled up.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, 2023-24 (latest available year; 2024-25 not yet published).",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","2,516"],
+        ["Factories in operation","2,022"],
+        ["Total employees","4,67,510"],
+        ["Gross Value of Output, 2023-24","₹52.39 lakh crore"],
+        ["Gross Value Added, 2023-24","₹6.92 lakh crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [1.22,1.40,1.65,1.99,2.43,2.15,2.13,3.35,4.35,5.24],
+      lineValues: [19.4,20.5,19.5,16.2,14.4,15.0,17.3,13.6,13.3,13.2],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO rose more than four-fold over the decade (₹1.22 lakh cr to ₹5.24 lakh cr, 2014-15 to 2023-24), the sharpest expansion of any sector in this series. But the value-added share of that output fell over the same period, from 19.4% to 13.2% — the sector is producing dramatically more, while capturing a shrinking share of the value per unit produced. This is the assembly-not-fabrication signature: materials consumed as a share of GVO rose from 50.4% (2014-15) to 72.8% (2023-24) over the same national ASI series."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [2351,2376,2325,2341,2452,2419,2356,2461,2399,2516]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [927.8,1017.2,887.7,831.3,874.8,933.5,840.9,713.4,645.0,612.4,627.5],
+      band: "Competitive band is HHI < 1,500 — Electronics sits inside it throughout the decade, unlike the top-20-firm-sample series shown here previously (which reported a Highly Concentrated reading above 2,500 through 2016-17). This HHI is computed directly from every firm reporting positive Revenue From Operations in the sector's Prowess export each year (478 to 562 firms depending on the year, not a fixed top-20 panel), so it is not comparable to that narrower, much higher-reading methodology. The full-universe series still shows genuine de-concentration, from a 2019-20 peak of 933.5 down to 627.5 by 2024-25, as new PLI-era assemblers scaled up and diluted the largest firms' share of a much bigger revenue base. Top-3 firm share on this same full-universe basis fell from 43.3% (2014-15) to 37.5% (2024-25)."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (national aggregate)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [0.797,0.653,0.680,0.726,0.578,0.579,0.622,0.524,0.478,0.431,0.480],
+      band: "Moderate band is 0.5×–1.5× — Electronics has drifted from the moderate band toward the asset-light end (0.43–0.48×) in the most recent three years, consistent with a sector expanding output faster than it expands fixed capital, i.e. more contract assembly per rupee of plant."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [71.2,4.8,3.8,20.2],
+      caption: "Raw material cost alone is 71.2% of sales (up from 46.5% in 2014-15) — the clearest single indicator of assembly-led growth. The residual 'Other / margin' band (20.2%) includes royalties & technical fees (1.1% of sales), overheads, and PAT margin (4.7% of sales)."
+    },
+    firmTable: {
+      note: "Top 5 firms by 2024-25 revenue (single-year basis, superseding the previous 3-year-average presentation). Source: Prowess IQ, 2026 pull, electronics_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. R&D % of sales and Export intensity are reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero — this is the case for four of the five firms below.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["Samsung India Electronics Pvt. Ltd.","Consumer electronics & mobile phones","1,11,183","10.15%","0.032%","41.31%"],
+        ["Foxconn Hon Hai Technology India Mega Devp. Pvt. Ltd.","Contract electronics manufacturing","1,01,878","1.94%","—","—"],
+        ["Tata Electronics Systems Solutions Pvt. Ltd.","Contract electronics manufacturing","51,853","2.38%","—","—"],
+        ["Vivo Mobile India Pvt. Ltd.","Mobile phones","41,395","1.77%","—","—"],
+        ["Oppo Mobiles India Pvt. Ltd.","Mobile phones","31,981","1.94%","—","—"]
+      ]
+    },
+    firmConcNote: "Concentration has genuinely fallen, though on a much smaller scale than the previous top-20-panel figures suggested. Computed from the full firm universe reporting revenue each year (see chart above), sector HHI stood at 627.5 in 2024-25, down from a 2019-20 peak of 933.5, and comfortably inside the 'Competitive' band throughout the decade — a very different picture from the old top-20-panel series, which reported the sector as 'Highly Concentrated' (HHI > 2,500) as recently as 2016-17. The top-3 firms' combined share on this same full-universe basis was 37.5% in 2024-25, down from 43.3% in 2014-15 — a materially different figure from the old panel measure, because the denominator here is the sector's entire reporting population (478 firms in 2024-25), not a fixed shortlist of 20. Firm-level PAT margins for four of the top five by revenue are thin (1.77%–2.38%), consistent with contract-assembly economics rather than IP-led manufacturing; Samsung is the clear exception at 10.15%, with the only non-blank R&D and export-intensity figures among the top five. The firms that actually lead the sector on R&D and export value and intensity are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, electronics_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["Bharat Electronics Ltd.","1,406.99"],
+        ["Tejas Networks Ltd.","252.32"],
+        ["Bharat Dynamics Ltd.","222.92"],
+        ["Luminous Power Technologies Pvt. Ltd.","55.93"],
+        ["Meril Healthcare Pvt. Ltd.","43.11"]
+      ]
+    },
+    rndByValueNote: "Bharat Electronics Ltd. leads absolute R&D spend by a wide margin (₹1,407 crore), consistent with its 5.95% R&D intensity on the intensity-leaders list below and its defence-electronics profile. Bharat Electronics is the only firm to appear on both the by-value and by-intensity R&D lists; none of the large-volume consumer assemblers in the firm table above (Foxconn, Tata Electronics, Vivo, Oppo) report meaningful R&D spend by either measure.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25. Source: Prowess IQ, 2026 pull, electronics_rnd_leaders.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Relisys Medical Devices Ltd.","19.05","180.45","10.56%"],
+        ["Bharat Dynamics Ltd.","222.92","3,345.05","6.66%"],
+        ["Sahajanand Technologies Pvt. Ltd.","4.95","78.76","6.29%"],
+        ["Bharat Electronics Ltd.","1,406.99","23,658.01","5.95%"],
+        ["Maestros Electronics & Telecommunications Systems Ltd.","1.30","28.89","4.5%"]
+      ]
+    },
+    rndLeadersNote: "R&D intensity in Electronics is concentrated in defence-electronics and specialty medical-device firms (Relisys, Bharat Dynamics, Bharat Electronics, Maestros), all comfortably in the Institute's 'Leader' band (>3%) — a sharp contrast with the large consumer-assembly firms that dominate the sector by revenue, none of which report R&D spend above 0.1% of sales.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, electronics_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Samsung India Electronics Pvt. Ltd.","45,930.00"],
+        ["Waaree Energies Ltd.","19,820.00"],
+        ["Schneider Electric I T Business India Pvt. Ltd.","5,244.84"],
+        ["Jabil Circuit India Pvt. Ltd.","3,382.97"],
+        ["G E Power Conversion India Pvt. Ltd.","2,924.54"]
+      ]
+    },
+    exportByValueNote: "Samsung India Electronics Ltd. leads by a wide margin (₹45,930 crore), consistent with its 41.31% export intensity in the firm table above. Waaree Energies Ltd. is the second-largest exporter by value, but its paired export-intensity figure (exports exceeding its own reported revenue) is a source data error and has been excluded from the intensity table below — its export value here is retained as plausible on its own, only the ratio against its revenue figure is unreliable.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25, source Prowess IQ, 2026 pull, electronics_export_leaders. One firm in the source list, Waaree Energies Ltd. (reported exports of ₹1,98,200 mn against reported revenue of just ₹1,27,646 mn, an implausible 155.27% ratio, i.e. exports exceeding total revenue), has been excluded as a source data error rather than a real intensity figure; it should be re-verified against Prowess directly before being cited. The four rows below are the remaining, plausible entries.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Switching Technologies Gunther Ltd.","7.72","7.72","100.01%"],
+        ["Vishay Semiconductor India Pvt. Ltd.","95.64","95.81","99.82%"],
+        ["Defsys Solutions Pvt. Ltd.","274.17","281.67","97.34%"],
+        ["Buchi Operations India Pvt. Ltd.","48.23","49.62","97.19%"]
+      ]
+    },
+    exportLeadersNote: "None of the four plausible export-intensity leaders appears on the by-value list above — these are smaller, near-fully export-oriented specialty electronics and defence-systems manufacturers rather than the sector's largest exporters by absolute value, which are large consumer-electronics and solar-equipment firms with bigger domestic books. Switching Technologies Gunther Ltd.'s reported 100.01% is a rounding artefact of near-total export orientation, not a data error, and has been retained.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 585 firms reporting in the sector in 2014-15, 135 have stopped reporting entirely and a further 16 are dormant (reporting but with negligible or zero activity), leaving 434 still active. Combined churn (stopped-reporting plus dormant) is 151 firms, or 25.8% of the original 2014-15 universe — a moderate-to-high churn rate among the sectors in this series. This 585-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year), which is why the two firm counts for FY2014-15 differ (585 vs 541)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "The fastest-growing sector by output, still below its 2018-19 peak",
+    subhead: "Electronics posts the sharpest headline growth numbers in the whole 11-sector series, but the index has still not recovered the level it reached in 2018-19 — and firm-level margins, while improving, remain thin.",
+    iipChart: {
+      title: "IIP index, Electronics, 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [100.6,115.2,117.6,123.6,126.7,148.5,168.7,151.0,132.0,146.6,137.2,121.7,133.0,142.2],
+      annotations: [
+        {index:6, label:"peak 168.7", color:"var(--thread-turmeric)"},
+        {index:9, label:"146.6 (post-COVID rebound)", color:"var(--thread-madder)"},
+        {index:13, label:"142.2 (latest)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[1.86,-0.14,2.03,4.70]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[5.03,-0.06,9.00,15.48]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Electronics — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2022-23"],
+      rows: [
+        ["Workers per factory","61.2","121.0","137.1"],
+        ["Wages per worker (₹)","1,65,851","2,27,014","2,31,095"],
+        ["Output per worker (₹)","84,44,658","1,12,53,026","1,32,12,441"],
+        ["Productivity–wage ratio","7.58","5.41","6.12"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","1.9%","4.7%"],
+        ["ROE %","5.0%","15.5%"],
+        ["ROCE %","11.2%","20.5%"],
+        ["Debt-to-Equity (×)","1.07","0.33"],
+        ["Interest Cover (×)","2.54","5.24"],
+        ["Current Ratio","1.34","1.23"],
+        ["Free Cash Flow (₹ mn)","54,115","7,926"]
+      ]
+    },
+    fcfNote: "Free Cash Flow is sharply volatile, not steadily improving: it ran as high as ₹2,44,797 million in 2023-24 before falling to ₹7,926 million in 2024-25 — the latest year coincided with Purchase of Fixed Assets rising to ₹2,91,648 million, the largest capex outlay of the decade, consistent with the investment surge described in the Investment theme.",
+    rndFlag: "R&D spend has fallen from 0.66% of sales (2014-15) to 0.33% (2024-25) — a clear 'laggard' by the Institute's own thresholds (Leader >3%, Active 1–3%, Laggard <1%), and moving in the wrong direction even as output has surged. This is consistent with a sector whose growth is running through assembly capacity, not in-house design.",
+    narrative: "Electronics shows the steepest output growth of any sector in this 11-sector series by several measures: it ranks 8th of 11 on CAGR and 4th on latest growth, but is also the 4th-most volatile. The index rose from 100.6 (2012-13) to a peak of 168.7 in 2018-19, then fell sharply through COVID and a subsequent 2022-24 slump (down to 121.7 in 2023-24) before recovering to 142.2 in 2025-26 — still 15.7% below the 2018-19 peak. Firm-level financials have improved over the same period (PAT margin 1.9%→4.7%, ROE 5.0%→15.5%), but margins remain among the thinnest of any sector: the top-selling firms in the Scale section post PAT margins of 0.6%–7.4%, the signature of contract assembly rather than branded, IP-led manufacturing."
+  },
+
+  trade: {
+    eyebrow: "03 — Trade",
+    title: "The country's largest and fastest-widening trade deficit",
+    subhead: "Electronics runs a structural trade deficit, not a surplus — and unlike the export narrative built around smartphone assembly, imports have consistently outpaced exports across the whole recent series.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[72751,72231,104985,171705,223342,303963,395815]},
+        {name:"Imports", color:"var(--thread-madder)", values:[379758,395387,543024,576793,678637,767465,926639]}
+      ]
+    },
+    stats:[
+      {n:"36.1%", l:"export growth, FY24-25"},
+      {n:"13.1%", l:"import growth, FY24-25 — still outpaced by exports, but a much larger base"},
+      {n:"71.6%", l:"import dependency"},
+      {n:"33.1%", l:"export 5-year CAGR"},
+      {n:"15.1%", l:"import 5-year CAGR"}
+    ],
+    netForexNote: "A company-financials cross-check points the same direction, more starkly: aggregate Net Forex (Forex Earnings minus Forex Outgo, reported directly by companies) was negative in every year of the series, including −₹11,85,309 million in 2024-25 — corroborating the customs-based deficit and, at the company level, a persistently larger one. This is the opposite pattern to Textiles, which is a net forex earner by both measures.",
+    caveatNote: "Figures in this section are directional rather than exact — the underlying HS-to-NIC concordance maps trade values to a sector; the unclassified remainder is excluded rather than estimated.",
+    partnersTable:{
+      note: "Top-5 partners by value, FY24-25",
+      cols:["#","Export partner (₹ cr)","Import partner (₹ cr)"],
+      rows:[
+        [1,"USA — 1,14,405","China — 2,95,242"],
+        [2,"UAE — 29,764","Hong Kong — 80,960"],
+        [3,"Netherlands — 22,157","USA — 45,308"],
+        [4,"UK — 15,238","Switzerland — 6,554"],
+        [5,"Germany — 8,829","UAE — 2,366"]
+      ]
+    },
+    productsTable:{
+      note: "Top products by value, FY24-25. HS-code level.",
+      cols:["Top export products (₹ cr)","Top import products (₹ cr)"],
+      rows:[
+        ["Smartphones — 2,05,017","Other electronic components — 1,28,837"],
+        ["Photovoltaic cells / modules — 9,463","Processors & controllers — 1,28,117"],
+        ["Voice/data transmission machines — 8,344","Portable data-processing machines <10kg — 51,772"],
+        ["Other electronic apparatus — 4,884","Other electronic components — 37,789"],
+        ["Digital processing units — 4,781","Memories — 37,480"]
+      ]
+    },
+    firmTable:{
+      note:"Electronics firms with reported trade metrics, ranked by export % of sales where available. Source: Prowess, via India_Mfg_Analysis Firm Scorecard, 3-yr average.",
+      cols:["Firm","Export % of sales","Imported RM % of total RM","PAT margin %"],
+      rows:[
+        ["Schneider Electric IT Business India Pvt. Ltd.","77.6%","64.6%","9.2%"],
+        ["Samsung India Electronics Pvt. Ltd.","48.4%","—","7.4%"],
+        ["Jabil Circuit India Pvt. Ltd.","37.1%","—","5.8%"],
+        ["Bhagwati Products Ltd.","—","73.4%","0.4%"],
+        ["D B G Technology (India) Pvt. Ltd.","—","86.5%","0.8%"],
+        ["Dixon Technologies (India) Ltd.","0.1%","57.0%","5.1%"]
+      ]
+    }
+  },
+
+  investment: {
+    eyebrow: "04 — Investment & PLI",
+    title: "A private-sector investment surge, with a sharp new-project pullback",
+    subhead: "New investment in Electronics has grown enormously and is overwhelmingly private — but the latest year shows the clearest warning sign of any sector reviewed so far: dropped-project count spiked more than four-fold.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[11460,309719,208751]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[77662,71100,90210]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE Industry Outlook.",
+      cols:["Indicator","Value"],
+      rows:[
+        ["Total investment outstanding","₹10,98,517 cr (374 projects)"],
+        ["Under implementation","₹4,59,616 cr (127 projects)"],
+        ["Implementation stalled","₹5,310 cr (8 projects)"],
+        ["Investments completed","₹20,067 cr (28 projects), up from ₹18,102 cr in 2023-24"],
+        ["New investments announced","₹2,08,751 cr (113 projects), down sharply from ₹3,48,013 cr in 2023-24"]
+      ]
+    },
+    dropFlag:"Dropped-investment project count jumped from 9 (2022-23) to 16 (2023-24) to 65 (2024-25), and continued rising to 85 in 2025-26 — a near ten-fold increase in three years, even as total outstanding investment stock kept growing. This is the sharpest deterioration in project-completion discipline of any theme reviewed in this sector.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore)",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Uttar Pradesh","15,713","21,342","55,718"],
+        ["Tamil Nadu","10,228","68,410","46,261"],
+        ["Maharashtra","74,131","20,159","1,83,801"]
+      ]
+    },
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[45,446,198734,9527]
+    },
+    ownershipNote:"Indian Private Sector dominates new investment overwhelmingly (₹1,98,734 cr in 2024-25); government's combined share is negligible. Foreign Private investment is volatile rather than steadily rising: it spiked to ₹2,63,242 cr in 2022-23 (likely reflecting one or a small number of very large projects) before falling back to ₹9,527 cr in 2024-25 — a reminder that a single large foreign-anchor investment can dominate a year's national total in this sector.",
+    pliNote:"PLI for Electronics carries the largest single-sector allocation of the government's 14-sector PLI programme: a total outlay of ₹40,995 crore (expanded on from ₹38,645 crore) for large-scale electronics manufacturing (Press Information Bureau). Against that, the Parliament was told in mid-2024 that 32 approved companies had committed ₹11,324 crore and actually invested ₹8,282 crore under the scheme to date. According to data sourced from Industry Outlook, only one year of PLI Scheme Expenditure is available for Electronics: 2022-23 Budget Estimate ₹5,300 crore against a Revised Estimate of ₹2,203 crore — a wide gap between planned and actually-spent. The data for the remaining years of the scheme is not yet published on Industry Outlook",
+    fdiNote:"According to Press Information Bureau (PIB) data, Foreign Direct Investment (FDI) in the electronics manufacturing sector increased by approximately 254% since the inception of the Production Linked Incentive (PLI) scheme. Official reports confirm over USD 4 billion in cumulative FDI inflows for this sector since FY 2020-21.",
+    rndHighlight: { pct: "0.33%", label: "R&D spend as share of sales — falling for a decade", band: "Laggard (<1%)", note: "The PLI outlay (₹38,645 crore total scheme) dwarfs the sector's annual R&D spend (0.33% of ₹52.4 lakh crore GVO, roughly ₹17,300 crore) by scale, but the two are not really comparable: PLI rewards production volume, not innovation. R&D intensity has fallen, not risen, over the same period the sector has scaled." },
+    insightBox:"India's Electronics sector is, on the numbers, a production-scaling success story and a value-capture story that has not yet arrived: GVO is up more than 4x in a decade, but value-added share of that output has fallen, R&D intensity has fallen, and import dependency (71.6%) means the growth itself pulls in more imports as it expands. The PLI scheme is explicitly a production-volume subsidy, and by that yardstick it appears to be working. Whether it shifts the sector from final assembly toward component manufacturing and design is a distinct, still-open question."
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Uttar Pradesh's mobile-assembly scale, Tamil Nadu's export orientation",
+    subhead: "Uttar Pradesh (Noida/Greater Noida) has emerged as the single largest state by GVO share, driven overwhelmingly by mobile-phone assembly — a genuinely new geography compared with most other manufacturing sectors, where western and southern states dominate.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Uttar Pradesh","Tamil Nadu","Karnataka"],
+      values:[159539,151117,52963]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5 (2023-24)",
+      xLabel:"State", yLabel:"% of national GVO",
+      labels:["Uttar Pradesh","Tamil Nadu","Karnataka","Telangana","Andhra Pradesh"],
+      values:[30.45,28.84,10.11,1.39,4.07]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹, 2023-24)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Uttar Pradesh","Tamil Nadu","Karnataka","Telangana","Andhra Pradesh"],
+      values:[220247,244988,175000,446461,301892]
+    },
+    stateTable:{
+      note:"Top-5 states by GVO share, ASI 2023-24 (latest available)",
+      cols:["State","Factories","GVO share","Wages/worker","GVO per factory (₹ lakh)"],
+      rows:[
+        ["Uttar Pradesh","353","30.4%","₹2,20,247","4,519.5"],
+        ["Tamil Nadu","285","28.8%","₹2,44,988","5,302.4"],
+        ["Karnataka","326","10.1%","₹1,75,000","1,624.6"],
+        ["Telangana","147","1.4%","₹4,46,461","496.1"],
+        ["Andhra Pradesh","31","4.1%","₹3,01,892","6,875.4"]
+      ]
+    },
+    flag:"Uttar Pradesh and Tamil Nadu together account for ~59% of national GVO — a two-state concentration sharper than most other sectors in this series. UP's dominance is recent and specific: the state's own investment promotion material attributes 55–60% of India's mobile-phone production to the Noida / Greater Noida cluster alone. Andhra Pradesh's very high GVO-per-factory figure (₹6,875 lakh) reflects a small number of large plants rather than a broad manufacturing base — its factory count (31) is the smallest of the top-5 states by a wide margin.",
+    jharkhandTitle:"A note on state-level volatility outside the top 5",
+    jharkhandText:"Several states outside the top-5 GVO ranking show large year-on-year swings on very small bases, similar in kind to the Jharkhand pattern documented in the Textiles paper. Andhra Pradesh's own GVO series illustrates this within the top 5: GVO rose from ₹3,292.2 million (2014-15) to a peak of ₹3,58,273.4 million (2018-19), a roughly 109x increase, before settling to ₹2,13,135.9 million by 2023-24 — a genuine but highly volatile trajectory rather than a smooth trend, likely reflecting the entry and exit of a small number of large plants in a state with only 31 factories total in the sector."
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Five major hubs, anchored by contract manufacturers and global brands",
+    subhead: "Electronics clusters line up closely with the Geography theme's leading states, and — unlike most other sectors reviewed — the cluster register names specific anchor firms (Foxconn, Samsung, Dell, Intel, Qualcomm) rather than just aggregate unit counts.",
+    clusterChips:[
+      "Sriperumbudur–Oragadam corridor, Tamil Nadu — 400+ units, rank #1",
+      "Bengaluru / Mysuru / Dharwad / Tumakuru, Karnataka — 300+ export units, rank #2",
+      "Gautam Budh Nagar (Noida / Greater Noida), Uttar Pradesh — rank #3",
+      "Pune region, Maharashtra — 300+ units, rank #4",
+      "Mumbai / Navi Mumbai / Thane, Maharashtra"
+    ],
+    clusterTable:{
+      note:"Principal Electronics clusters, selected indicators. Source: Cluster Observatory, Sameeksha.",
+      cols:["Cluster","State","Anchor / major firms","Principal products","Export orientation"],
+      rows:[
+        ["Sriperumbudur–Oragadam","Tamil Nadu","Foxconn, Flextronics, Dell India, Samsung India, Nokia Solutions","Smartphones, consumer electronics, laptops, electronic components","Yes (US, SE Asia, Europe, Middle East)"],
+        ["Bengaluru / Mysuru / Dharwad / Tumakuru","Karnataka","Intel, Qualcomm, Wistron, Bharat Electronics","Defence, aerospace & comms systems, PCB assembly, tooling","Yes (North America, Europe, Middle East)"],
+        ["Gautam Budh Nagar (Noida / Greater Noida)","Uttar Pradesh","Oppo, Vivo, Samsung India, Dixon Technologies, LG Electronics","Smartphone manufacturing","Partial (Japan, South Korea, Central Asia, Germany)"],
+        ["Pune region","Maharashtra","SFO Technologies, inYantara Technologies","PCB assembly, box-build integration, cable assemblies","Yes (US, UAE, Hong Kong, China, Mexico)"]
+      ]
+    },
+    note:"Cluster locations align very closely with the Geography theme's top-2 states — Tamil Nadu's Sriperumbudur–Oragadam corridor and Uttar Pradesh's Noida/Greater Noida cluster are, respectively, the export-facing and domestic-assembly anchors behind those two states' GVO dominance. Karnataka's cluster set is more design- and defence-oriented than the other three, consistent with its lower GVO share but distinct product mix.",
+    noteD:"The Tamil Nadu cluster source notes the state recorded roughly $12.62 billion in electronics exports in the first 11 months of FY2024-25 alone (about 37% of India's total electronics exports) — a figure sourced from the cluster register's own citations rather than independently re-verified here.",
+    noteE:"While geographic co-location indicates the presence of major industry players within the electronics cluster, there is a systemic lack of empirical data regarding explicit firm-to-firm supply chain linkages."
+  }
+};
+
+/* =====================================================================
+   THE SECTOR STORY
+   ===================================================================== */
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "Scaling fast, capturing thin",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Electronics stands today.",
+  sections: [
+    { h: "The core tension: explosive output growth, falling value capture", p: [
+      "Electronics is the fastest-scaling sector in this series by almost any raw measure: factories grew from 2,351 to 2,516 (2014-15 to 2023-24), but Gross Value of Output rose more than four-fold, from ₹1.22 lakh crore to ₹5.24 lakh crore over the same window — a rate of expansion no other sector in this series comes close to matching. Firm-level financials have genuinely improved too: PAT margin rose from 1.9% (2014-15) to 4.7% (2024-25), and ROE from 5.0% to 15.5%.",
+      "But the value-added share of that output fell from 19.4% to 13.2% over the decade, and materials consumed as a share of GVO rose from 50.4% to 72.8% — the clearest possible signature of a sector whose growth runs overwhelmingly through final assembly rather than component fabrication or design. R&D spend, instead of rising alongside the investment boom, fell from 0.66% of sales to 0.33% — moving the wrong direction even as output surged. The firm structure, measured on a full-firm-universe basis, has stayed comfortably inside the Competitive HHI band throughout the decade, with genuine further de-concentration from a 2019-20 peak of 933.5 down to 627.5 by 2024-25 — a real but far more modest trend than the old top-20-panel series suggested (which had reported the sector as Highly Concentrated, HHI > 2,500, as recently as 2016-17). On the IIP, Electronics ranks 4th of 11 sectors on latest growth but only 8th on long-run CAGR and 4th-most volatile — a sector that grows in bursts rather than steadily, and whose 2025-26 index level (142.2) still sits 15.7% below its 2018-19 peak (168.7)."
+    ]},
+    { h: "Trade: the country's largest and fastest-widening deficit", p: [
+      "Unlike Textiles, Electronics is not a net export sector — it runs a structural and widening trade deficit. Exports grew fast in FY24-25 (36.1% YoY, ₹3.04 lakh crore, driven overwhelmingly by smartphones at ₹2.05 lakh crore of export value on their own), but imports, at ₹7.67 lakh crore, are more than double exports and grew a further 13.1% on an already much larger base. Import dependency stands at 71.6% of consumption. China alone supplies ₹2.95 lakh crore of imports, roughly 4x the next-largest import partner (Hong Kong). A company-financials cross-check corroborates the direction more starkly: aggregate Net Forex has been negative every year in the series, including −₹1.19 lakh crore in 2024-25."
+    ]},
+    { h: "Investment: a private-sector boom, with a sharp project-completion warning sign", p: [
+      "Investment in Electronics is almost entirely private-sector-led and has grown at a pace that dwarfs most other sectors in this series: new investment announced reached ₹2.09 lakh crore in 2024-25, down from an unusually large ₹3.48 lakh crore in 2023-24. Total outstanding investment stock stood at ₹10.99 lakh crore across 374 projects. The concerning signal is sharper here than in any other theme reviewed: dropped-investment project count rose from 9 (2022-23) to 16 (2023-24) to 65 (2024-25) to 85 (2025-26) — a near ten-fold rise in three years. The PLI scheme for large-scale electronics manufacturing carries the largest single allocation of the government's 14-sector programme (₹38,645 crore total outlay, externally sourced), against roughly ₹8,282 crore actually invested by approved companies as of mid-2024 — a wide gap between committed scheme size and realised spend that mirrors the pattern the Institute has flagged in other PLI-covered sectors."
+    ]},
+    { h: "Geography: a genuinely new industrial map", p: [
+      "Electronics geography looks different from most other manufacturing sectors in this project: Uttar Pradesh, driven almost entirely by the Noida / Greater Noida mobile-assembly cluster, is the single largest state by GVO share (30.4%), ahead of Tamil Nadu (28.8%) and well ahead of the traditional western-and-southern manufacturing belt. Tamil Nadu's Sriperumbudur–Oragadam corridor is the more export-oriented and diversified of the two leading hubs, hosting Foxconn, Dell, Samsung and Nokia's Indian operations. Karnataka (10.1% GVO share) is smaller by volume but distinct in character — more design- and defence-electronics-oriented, anchored by Intel, Qualcomm, and Bharat Electronics."
+    ]},
+    { h: "Clusters: named anchor firms, unmapped supply chains", p: [
+      "Four to five major clusters are identifiable and, unusually for this project, the underlying register names specific anchor firms rather than only aggregate unit counts — Sriperumbudur–Oragadam (Foxconn, Dell, Samsung, Nokia), Bengaluru's design-and-defence belt (Intel, Qualcomm, Bharat Electronics), Noida/Greater Noida (Oppo, Vivo, Samsung, Dixon), and Pune. But as with other sectors in this series, firm-to-firm supply-chain linkage data is not yet populated — the register shows co-location of major players, not confirmed supplier relationships, and that remains a genuine data gap rather than a finding about the sector."
+    ]},
+    { h: "R&D: a laggard moving the wrong direction", p: [
+      "R&D spend as a share of sales fell from 0.66% (2014-15) to 0.33% (2024-25) — squarely in the 'laggard' band (below 1%) and declining even as the sector's output and investment both surged. This is the clearest quantitative marker in the whole dataset for the assembly-not-innovation character of the sector's growth: two firms in the top-20 sample (Tejas Networks at 12.1% of sales, Bharat Electronics at 6.1%) sit in the 'Leader' band and pull the average up somewhat, but the large-volume assemblers (Foxconn, Oppo, Vivo, Samsung) report negligible or unreported R&D spend."
+    ]}
+  ],
+  summary: [
+    {n:"+330%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"19.4→13.2%", l:"GVA share of GVO, 2014-15 → 2023-24"},
+    {n:"0.33%", l:"R&D spend, share of sales (2024-25), falling"},
+    {n:"₹38,645 cr", l:"PLI total outlay (largest of 14 sectors)"},
+    {n:"3,392→1,292", l:"HHI, 2015-16 → 2024-25"}
+  ],
+  takeaway: "Electronics is the sector in this series with the clearest gap between headline scale and underlying value capture: output has quadrupled, investment is booming, and concentration has fallen sharply as new assemblers have entered — but the value-added share of output is shrinking, R&D intensity is falling, the trade balance is a large and widening deficit, and the latest year shows a sharp deterioration in investment-project completion. The PLI programme is explicitly designed to reward production scale, and on that narrow metric it is working; whether it shifts the sector's underlying economics toward component manufacturing, design, and export-net-positive trade is the open question the next few years of data will answer.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, 2014-15 to 2023-24.",
+    "Index of Industrial Production, corrected 11-sector composite, Ministry of Statistics and Programme Implementation.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, 20-firm panel by sector.",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates, FY14-15 to FY24-25, and CapEx Investment Pipeline database.",
+    "Cluster Observatory, Sameeksha, SIPCOT Tamil Nadu, Invest Karnataka, Invest UP, and MIDC Maharashtra cluster profiles.",
+    "CareEdge Ratings, cited via The Tribune, 'Electronics manufacturing leads PLI scheme as production jumps 146%', January 2026 — PLI total outlay and disbursement figures.",
+    "Government of India, Lok Sabha and Rajya Sabha written replies (Ministry of Electronics and IT), July 2024 — PLI Large Scale Electronics Manufacturing scheme investment and production figures.",
+    "Business Standard, 'Govt disburses ₹28,748 crore under 14 PLI schemes till December 2025', February 2026."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to a small documented residual against the official total; this does not affect sectors' relative ranking."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures maps trade values to a sector; the unclassified remainder is excluded rather than estimated. Treat trade figures as directional rather than exact."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"PLI figures in this paper distinguish total multi-year scheme outlay (Ministry / press sources, a policy-design number, externally verified since not present in the CMIE Industry Outlookfor this sector beyond one year) from actual CMIE-reported annual disbursement (an execution number). The only CMIE-sourced disbursement data point available for Electronics is 2022-23: Budget Estimate ₹5,300 crore, Revised Estimate ₹2,203 crore. Other years are a flagged data gap, not estimated."},
+    {tag:"(f)", text:"Andhra Pradesh's Electronics GVO series shows very large year-on-year swings (a roughly 109x rise from 2014-15 to a 2018-19 peak, then a partial retreat) on a small factory base (31 factories in 2023-24) — read as evidence of a small number of large plant entries/exits rather than a smooth structural trend."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · Paper 10 of 11 · NIC Division 26 · Primary research: To be asked · Compiled by: Riddhi Bhargava"
+};
+
+/* =====================================================================
+   LAYOUT — canvas positions for each node.
+   ===================================================================== */
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  series.forEach(ser=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`; });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <p class="cc-eyebrow">Textiles Sector Snapshot</p>
+      <h1 class="cc-title">${c.title}</h1>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">0.33%</div><div class="rnd-label">of sales — R&D spend, falling for a decade</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.stats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <div style="margin-top:26px">${table(d.partnersTable)}</div></div></div>
+    <div class="grid1"><p class="block-title">Net Forex cross-check</p><p class="narrative" style="font-size:18px">${d.netForexNote}</p></div>
+    <div class="grid1"><p class="block-title">Top traded products, FY24-25</p>${table(d.productsTable)}</div>
+    <div class="grid1"><p class="block-title">Firm trade profile, ranked</p>${table(d.firmTable)}</div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="rnd-callout" style="margin-top:8px"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap"><div class="rnd-num">${d.rndHighlight.pct}</div><div><div class="rnd-label">${d.rndHighlight.label}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">${d.rndHighlight.band}</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div></div></div><p class="rnd-note" style="margin-top:14px">${d.rndHighlight.note}</p></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    <h3 style="font-family:var(--display);font-size:25px;font-weight:600;margin:36px 0 10px;color:var(--thread-indigo)">${d.jharkhandTitle}</h3>
+    <p class="narrative" style="font-size:18px">${d.jharkhandText}</p>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <p class="block-title">Registered clusters</p>
+    <div class="chip-row">${d.clusterChips.map(c=>`<div class="chip">${c}</div>`).join("")}</div>
+    <div class="grid1" style="margin-top:30px">${table(d.clusterTable)}</div>
+    <div class="flag" style="margin-top:20px">${d.note}</div>
+    <p class="block-note" style="margin-top:16px"><b>Note (d):</b> ${d.noteD}</p>
+    <p class="block-note" style="margin-top:8px"><b>Note (e):</b> ${d.noteE}</p>
+    </div>`;
+}
+
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Textiles Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>

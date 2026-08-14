@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chemicals: Steady, Deconcentrating, Trade Surplus Shrinking — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Chemicals Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Chemicals",
+    tagline: "India's highest-scoring sector on the IIP composite index and a firm structure that has stayed consistently competitive on concentration, but one whose value-added share of output is slipping and whose trade surplus has nearly disappeared.",
+    stats: [
+      {n:"37,907", l:"factories (2023-24)"},
+      {n:"₹41.81 L cr", l:"gross value of output, ASI"},
+      {n:"₹15,934 cr", l:"trade surplus, FY24-25 (razor-thin)"},
+      {n:"4 / 11", l:"IIP level rank"},
+      {n:"+0.55%", l:"latest IIP growth, 2025-26"},
+      {n:"42.4%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "Large, refinery-anchored, and consistently competitive on concentration",
+    subhead: "Chemicals (NIC Divisions 19-22: coke and refined petroleum, chemicals, pharmaceuticals, rubber and plastics) is the largest sector by output of the eleven covered here. Factory count and output have both grown, and on a full-firm-universe basis the market has stayed within the Competitive HHI band throughout the decade, without a clear directional trend.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, national totals, 2023-24.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","37,907"],
+        ["Factories in operation","31,125"],
+        ["Total persons engaged","33.04 lakh"],
+        ["Gross Value of Output, 2023-24","₹41.81 lakh crore"],
+        ["Gross Value Added, 2023-24","₹6.55 lakh crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [20.61,19.59,19.94,21.85,26.47,25.65,23.89,34.17,43.52,41.81],
+      lineValues: [18.0,22.4,23.3,21.0,15.7,15.8,19.7,17.9,15.2,15.7],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO more than doubled over the decade (₹20.61 lakh crore to ₹41.81 lakh crore), but the value-added share of that output fell, from 18.0% in 2014-15 to 15.7% in 2023-24, with a low of 15.2% in 2022-23. This is the mirror image of the Textiles pattern: Chemicals is producing much more, but capturing a smaller share of it as value added, consistent with a sector whose largest firms are refining and bulk-petrochemical throughput businesses rather than higher-margin specialty producers."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [31793,32486,32832,33401,34251,35276,36267,35903,36747,37907]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [877.6,760.7,781.3,819.7,847.3,804.4,703.0,782.3,847.7,823.2,779.0],
+      band: "Competitive band is HHI < 1,500 — Chemicals sits comfortably inside it throughout, oscillating in a narrow 703-878 range rather than trending clearly in either direction. This HHI is computed directly from every firm reporting positive Revenue From Operations in the sector's Prowess export each year (1,991 to 2,250 firms depending on the year, not a fixed top-20 panel), so it is not comparable to the top-20-sample HHI shown on this page previously (which ran roughly 1,600-2,400, an order of magnitude higher on a much narrower base). Top-3 firm share on this same full-universe basis ranged from 39.9% (2020-21) to 46.2% (2014-15), landing at 42.4% in 2024-25; the number of firms reporting usable revenue held broadly steady in the 2,200s for most of the decade before falling to 1,991 in 2024-25."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (aggregate, all companies)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [0.425,0.479,0.481,0.494,0.441,0.535,0.619,0.463,0.433,0.483,0.508],
+      band: "Moderate band is 0.5×-1.5× — Chemicals sits right at the boundary, tipping in and out of it year to year rather than settling clearly on either side."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [49.5,3.7,2.7,44.1],
+      caption: "Power & fuel (2.7%) and Royalties & technical fees (0.15%, not separately charted) are both modest for this sector; the 44.1% residual 'Other / margin' band includes overheads, financing costs, and PAT margin (5.67% of total income in 2024-25). Raw material cost (49.5% of sales) is the dominant line, consistent with a feedstock-heavy sector (crude oil, naphtha, and basic chemical inputs)."
+    },
+    firmTable: {
+      note: "Top 5 firms by 2024-25 revenue (single-year basis, superseding the previous 3-year-average presentation). Source: Prowess IQ, 2026 pull, chemicals_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. Export Intensity is reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero — this is the case for all five firms below.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["Indian Oil Corpn. Ltd.","Refining & petroleum","8,45,513","1.53%","0.037%","—"],
+        ["Reliance Industries Ltd.","Refining, petrochemicals","5,32,792","6.62%","0.288%","—"],
+        ["Bharat Petroleum Corpn. Ltd.","Refining & petroleum","5,00,371","2.65%","0.014%","—"],
+        ["Hindustan Petroleum Corpn. Ltd.","Refining & petroleum","4,66,346","1.58%","0.056%","—"],
+        ["Nayara Energy Ltd.","Refining & petroleum","1,49,474","4.06%","0.003%","—"]
+      ]
+    },
+    firmConcNote: "Concentration is low and has moved without a clear trend. Computed from the full firm universe reporting revenue each year (see chart above), sector HHI stood at 779.0 in 2024-25, close to its 2014-15 starting point of 877.6 and comfortably inside the 'Competitive' band throughout the decade. The top-3 firms' combined share on this same full-universe basis was 42.4% in 2024-25 — a materially different figure from the top-20-panel measure previously shown on this page, because the denominator here is the sector's entire reporting population (1,991 firms in 2024-25), not a fixed shortlist. All five top firms by revenue are refining and petroleum majors; R&D spend is a negligible share of sales for every one of them (0.003%-0.288%), and none report a non-blank export-intensity figure at source. The firms that actually lead the sector on R&D and export value and intensity — mostly pharmaceutical companies, a very different part of the NIC 19-22 scope — are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, chemicals_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["Dr. Reddy'S Laboratories Ltd.","2,416.70"],
+        ["Sun Pharmaceutical Inds. Ltd.","1,823.17"],
+        ["Reliance Industries Ltd.","1,533.00"],
+        ["Cipla Ltd.","1,238.73"],
+        ["Lupin Ltd.","1,223.80"]
+      ]
+    },
+    rndByValueNote: "By absolute spend the list is dominated by large listed pharmaceutical companies (Dr. Reddy's, Sun Pharma, Cipla, Lupin), with Reliance Industries the sole non-pharma name, present on scale rather than R&D intensity (0.288% of its own sales, per the firm table above). None of these five firms also appears on the R&D intensity-leaders list below — the sector's largest R&D spenders in absolute terms are not its most R&D-intensive firms.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25, source Prowess IQ, 2026 pull, chemicals_rnd_leaders. One firm in the source list, Gumpro Drilling Fluids Pvt. Ltd. (reported R&D of ₹30.3 mn against reported revenue of just ₹0.016 mn, an implausible 189,731% ratio), has been excluded as a source data error rather than a real intensity figure; it should be re-verified against Prowess directly before being cited. The four rows below are the remaining, plausible entries.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Baxter Pharmaceuticals India Pvt. Ltd.","148.67","668.97","22.22%"],
+        ["Watson Pharma Pvt. Ltd.","195.72","961.44","20.36%"],
+        ["Gennova Biopharmaceuticals Ltd.","77.23","429.95","17.96%"],
+        ["Viyash Scientific Ltd.","30.78","178.26","17.27%"]
+      ]
+    },
+    rndLeadersNote: "R&D intensity in Chemicals is concentrated in specialty pharmaceutical and biopharma firms (Baxter, Watson, Gennova, Viyash), all reporting R&D spend of 17% or more of sales, comfortably in the Institute's 'Leader' band (>3%) — a sharp contrast with the sector's largest firms by revenue, the refining majors in the firm table above, all under 0.3%.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, chemicals_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Aurobindo Pharma Ltd.","9,161.52"],
+        ["Cipla Ltd.","6,330.27"],
+        ["Mody Chemi Pharma Ltd.","4,902.67"],
+        ["M S N Laboratories Pvt. Ltd.","4,807.15"],
+        ["A P L Healthcare Ltd.","3,816.27"]
+      ]
+    },
+    exportByValueNote: "Aurobindo Pharma Ltd. leads by a wide margin in absolute export value (₹9,162 crore), ahead of Cipla (₹6,330 crore). Mody Chemi Pharma Ltd. is the only firm to also appear on the export-intensity list's source data, but with a flagged, implausible ratio there (see note below) — its underlying revenue figure needs re-verification even though its export value here looks plausible on its own.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25, source Prowess IQ, 2026 pull, chemicals_export_leaders. One firm in the source list, Mody Chemi Pharma Ltd. (reported exports of ₹49,027 mn against reported revenue of just ₹1,307 mn, an implausible 3,750% ratio), has been excluded as a source data error rather than a real intensity figure; it should be re-verified against Prowess directly before being cited. The four rows below are the remaining, plausible entries.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Somerset Therapeutics Pvt. Ltd.","295.53","295.56","99.99%"],
+        ["Medior Healthcare Pvt. Ltd.","12.09","12.16","99.44%"],
+        ["Core Carbons Pvt. Ltd.","310.86","314.55","98.83%"],
+        ["Suretex Prophylactics (India) Pvt. Ltd.","179.48","182.95","98.1%"]
+      ]
+    },
+    exportLeadersNote: "None of the four plausible export-intensity leaders appears on the by-value list above — these are smaller, near-fully export-oriented specialty pharma and rubber-goods manufacturers (Somerset, Medior, Core Carbons, Suretex) rather than the sector's largest exporters by absolute value, which are large generic-pharma manufacturers with bigger domestic books alongside their exports.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 2,360 firms reporting in the sector in 2014-15, 409 have stopped reporting entirely and a further 61 are dormant (reporting but with negligible or zero activity), leaving 1,890 still active. Combined churn (stopped-reporting plus dormant) is 470 firms, or 19.9% of the original 2014-15 universe — a moderate churn rate relative to other sectors in this series. This 2,360-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year), which is why the two firm counts for FY2014-15 differ (2,360 vs 2,227)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "The strongest IIP performer of the eleven sectors, but growth has cooled",
+    subhead: "Chemicals ranks 4th of 11 sectors by IIP level and 4th by full-period CAGR, one of only two sectors (with Metals and Transport Equipment) to have grown its index roughly 46% since the 2012-13 base year. But the most recent year's growth is close to flat, and volatility is the lowest of any of the eleven sectors.",
+    iipChart: {
+      title: "IIP index, Chemicals composite (incl. Pharmaceuticals), 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [105.6,109.6,110.6,117.4,128.9,138.6,141.6,141.3,133.9,140.8,145.6,150.9,153.1,153.9],
+      annotations: [
+        {index:6, label:"141.6 (pre-COVID peak)", color:"var(--thread-turmeric)"},
+        {index:8, label:"133.9 (COVID)", color:"var(--thread-madder)"},
+        {index:13, label:"153.9 (latest)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[3.16,4.31,4.66,5.67]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[9.10,9.49,11.38,11.24]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Chemicals — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2022-23"],
+      rows: [
+        ["Workers per factory","45.3","62.2","61.8"],
+        ["Wages per worker (₹)","1,61,339","2,22,323","2,39,844"],
+        ["Output per worker (₹)","1,43,10,018","1,52,98,388","1,91,51,686"],
+        ["Productivity-wage ratio","13.05","10.01","9.90"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","3.2%","5.7%"],
+        ["ROE %","9.1%","11.2%"],
+        ["ROCE %","12.3%","13.4%"],
+        ["Debt-to-Equity (×)","0.73","0.40"],
+        ["Interest Cover (×)","5.10","7.10"],
+        ["Current Ratio","1.15","1.26"],
+        ["Free Cash Flow (₹ mn)","8,59,316","19,25,850"]
+      ]
+    },
+    fcfNote: "Free Cash Flow more than doubled over the decade (₹8,59,316 million in 2014-15 to ₹19,25,850 million in 2024-25), and has stayed positive throughout, unlike the volatile, occasionally negative pattern seen in Textiles.",
+    rndFlag: "R&D spend has held between 0.47% and 0.67% of sales across the decade (0.55% in 2024-25) — a 'laggard' by the Institute's thresholds (Leader >3%, Active 1-3%, Laggard <1%), though noticeably higher than Textiles' ~0.10%, reflecting the pharmaceutical component of this sector.",
+    narrative: "Chemicals has been the strongest all-round IIP performer among the eleven sectors covered here: 4th on level, 4th on full-period CAGR (2.94%), and the least volatile of any sector (rank 11 of 11 on the volatility measure, meaning the most stable). Unlike Textiles, it fully recovered from its COVID-year dip (133.9 in 2020-21 versus a 2018-19 peak of 141.6) and went on to set new highs every year since, reaching 153.9 by 2025-26. The one softer signal: the most recent year's growth was just 0.55%, ranking 8th of 11 sectors on latest-year growth, well behind the CAGR that got it here. Financial performance of tracked firms improved steadily over the decade (PAT margin 3.2% to 5.7%, ROE 9.1% to 11.2%, Debt-to-Equity nearly halved), and Free Cash Flow position is comfortably positive throughout, a materially healthier balance-sheet profile than Textiles showed across the same measures."
+  },
+
+  investment: {
+    eyebrow: "03 — Investment & PLI",
+    title: "Private-sector investment at scale, a PLI scheme for the pharmaceuticals slice, and a sharp rise in dropped projects",
+    subhead: "Chemicals carries the largest investment pipeline of any sector in this dataset by a wide margin, still overwhelmingly private. The PLI scheme covers Drugs and Pharmaceuticals specifically, not chemicals broadly; there is no PLI scheme for the bulk/basic chemicals segment. Dropped-project value has risen sharply in 2024-25.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[223845,786973,690391]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[78833,118400,278961]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE CapEx database.",
+      cols:["Indicator","Value"],
+      rows:[
+        ["Total investment outstanding","₹12,70,220 cr (1,101 projects)"],
+        ["Under implementation","₹37,53,570 cr (2,382 projects)"],
+        ["Implementation stalled","₹22,066 cr (108 projects)"],
+        ["Investments completed","₹37,818 cr (down from ₹79,287 cr in 2023-24)"],
+        ["New investments announced","₹6,90,391 cr (down from ₹6,83,101 cr in 2023-24)"]
+      ]
+    },
+    dropFlag:"Dropped-investment cost roughly tripled from ₹98,968 crore (2023-24) to ₹2,78,961 crore (2024-25), and dropped-project count has risen every year since 2019-20 (87 to 464 projects) — a much sharper deterioration than the pattern seen in Textiles, worth flagging even though the absolute pipeline is far larger.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore). Ranked by the sector's actual GVO order (Gujarat, Maharashtra, Tamil Nadu), not the fixed template ordering.",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Gujarat","1,22,623","1,31,975","5,00,423"],
+        ["Maharashtra","1,17,426","2,63,937","2,81,123"],
+        ["Tamil Nadu","3,81,657","5,24,922","5,18,125"]
+      ]
+    },
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[83392,395,579770,26700]
+    },
+    ownershipNote:"Indian Private Sector dominates new investment overwhelmingly (₹5,79,770 crore of the ₹6,90,391 crore total, roughly 84%); combined government share (Central + State) is about 12%, and Foreign Private is under 4%. The ownership-split total (₹6,90,257 crore) reconciles closely with the pipeline total (₹6,90,391 crore) reported separately.",
+    pliNote:"PLI for Drugs and Pharmaceuticals (the segment of Chemicals covering NIC 21) had Revised Estimate expenditure of ₹1,696.3 crore in 2023-24, rising to ₹2,150.5 crore (Revised Estimate) in 2024-25 and a Budget Estimate of ₹2,444.9 crore for 2025-26. There is no PLI scheme for the bulk/basic chemicals, petrochemicals, or plastics segments of this sector; PLI exposure here is specific to pharmaceuticals, not sector-wide.",
+    fdiNote:"A dedicated FDI figure for the combined Chemicals sector (NIC 19-22) was not available in the sources reviewed for this paper and is flagged rather than estimated; DPIIT publishes FDI by narrower sub-categories (Chemicals other than fertilisers, Drugs and Pharmaceuticals, Petroleum and Natural Gas) that do not sum cleanly to this project's NIC-based sector definition without further reconciliation.",
+    rndHighlight: { pct: "0.55%", label: "R&D spend as share of sales, 2024-25", band: "Laggard (<1%)", note: "The PLI Revised Estimate for Drugs & Pharmaceuticals alone (₹2,150.5 crore in 2024-25) is a small fraction of the sector's R&D spend (₹24,744.5 crore, aggregate all-companies, 2024-25) — R&D here is overwhelmingly firm-funded, not policy-subsidised." },
+    insightBox:"Two different investment stories sit inside one sector label: a very large, still-growing, overwhelmingly private pipeline dominated by refining and petrochemical capacity, and a much smaller, explicitly targeted PLI scheme that applies only to the pharmaceuticals slice. Reading the PLI figure as representative of the sector's investment policy would understate the story; reading the investment pipeline as PLI-driven would overstate it."
+  },
+
+  trade: {
+    eyebrow: "04 — Trade",
+    title: "A trade surplus that has all but disappeared",
+    subhead: "Chemicals exports fell in FY24-25 while imports kept rising, leaving a trade surplus of just ₹15,934 crore, roughly 1% of export value, down from a far larger surplus in earlier years. Import dependency, at 49.7%, is the highest of any theme covered in this paper series so far.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[725091,679433,1079474,1392479,1347207,1215731,1169708]},
+        {name:"Imports", color:"var(--thread-madder)", values:[664176,657636,1043295,1255638,1120398,1199797,1338228]}
+      ]
+    },
+    stats:[
+      {n:"-9.8%", l:"export growth, FY24-25 — falling"},
+      {n:"+7.1%", l:"import growth, FY24-25"},
+      {n:"49.7%", l:"import dependency"},
+      {n:"10.9%", l:"export 5-year CAGR"},
+      {n:"12.6%", l:"import 5-year CAGR"}
+    ],
+    caveatNote: "Figures in this section are directional rather than exact — the underlying HS-to-NIC concordance maps a majority but not all of trade value to a sector; the remainder is unclassified and excluded rather than estimated. A large share of both export and import value in this sector is refined petroleum products (HS 2710), so global crude-oil price movements, not just domestic manufacturing competitiveness, drive much of the year-to-year swing in these figures.",
+    partnersTable:{
+      note: "Top-5 partners by value, FY24-25",
+      cols:["#","Export partner (₹ cr)","Import partner (₹ cr)"],
+      rows:[
+        [1,"USA — 1,85,775","China — 2,07,745"],
+        [2,"Netherlands — 1,28,852","UAE — 1,14,597"],
+        [3,"UAE — 85,127","USA — 87,442"],
+        [4,"Singapore — 57,538","Saudi Arabia — 63,482"],
+        [5,"China — 46,963","Russia — 45,129"]
+      ]
+    },
+    productsTable:{
+      note: "Top-5 traded products by value, FY24-25. HS 2710/2711 codes (petroleum oils, LNG, LPG) dominate both sides, reflecting the sector's inclusion of coke and refined petroleum (NIC 19).",
+      cols:["#","Export product (₹ cr)","Import product (₹ cr)"],
+      rows:[
+        [1,"Other petroleum oils/bituminous oils — 3,64,166","Liquified natural gas — 1,25,834"],
+        [2,"Light oils and preparations — 1,63,420","Liquified butanes — 62,955"],
+        [3,"Other medicaments, retail pack — 1,61,154","Other petroleum/bituminous oils — 61,420"],
+        [4,"Herbicides, plant-growth regulators — 13,161","Liquified propane — 60,321"],
+        [5,"Heterocyclic compounds (N hetero-atom) — 12,739","Copper ores and concentrates — 32,558"]
+      ]
+    },
+    firmTable:{
+      note:"Chemicals-sector firms with usable export ratios from the trade-profile data. Source: Prowess. Reliance Industries and Indian Oil Corporation are the sector's largest absolute exporters by far, but their reported 'Sales from goods' figures in the underlying workbook appear to be scoped to only part of each conglomerate's business, producing an export-intensity ratio above 100% — flagged as a data-quality issue and excluded from the ratio column below rather than reported as-is.",
+      cols:["Firm","Export % of sales (3-yr avg)","PAT margin % (3-yr avg)","Segment"],
+      rows:[
+        ["Cipla Ltd.","34.5%","20.6%","Pharmaceuticals"],
+        ["Apollo Tyres Ltd.","13.7%","n/a*","Rubber & tyres"],
+        ["MRF Ltd.","7.1%","n/a*","Rubber & tyres"]
+      ]
+    },
+    scopeNote: "*PAT margin was not filled in at source for Apollo Tyres and MRF in the underlying firm-level workbook and is left blank rather than estimated."
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Gujarat's scale dwarfs every other state",
+    subhead: "Gujarat alone accounts for close to three in ten rupees of the sector's national output, roughly double its nearest rival, and hosts the largest concentration of registered chemical clusters of any state in this dataset.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Gujarat","Maharashtra","Tamil Nadu"],
+      values:[1214805,548184,223396]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5",
+      xLabel:"State", yLabel:"% of national GVO",
+      labels:["Gujarat","Maharashtra","Tamil Nadu","Uttar Pradesh","Andhra Pradesh"],
+      values:[29.05,13.11,5.34,5.14,4.77]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Gujarat","Maharashtra","Tamil Nadu","Uttar Pradesh","Andhra Pradesh"],
+      values:[243285,291349,199100,200112,316170]
+    },
+    stateTable:{
+      note:"Top-5 states, latest available ASI year (2023-24)",
+      cols:["State","Factories","GVO share","Employment share","Wages/worker"],
+      rows:[
+        ["Gujarat","7,312","29.1%","21.9%","₹2,43,285"],
+        ["Maharashtra","4,647","13.1%","14.4%","₹2,91,349"],
+        ["Tamil Nadu","4,826","5.3%","9.1%","₹1,99,100"],
+        ["Uttar Pradesh","2,646","5.1%","5.4%","₹2,00,112"],
+        ["Andhra Pradesh","1,590","4.8%","4.6%","₹3,16,170"]
+      ]
+    },
+    flag:"Top-5 states account for ~57% of national GVO, less concentrated than Textiles' ~65% but built around one dominant state (Gujarat) rather than a spread. Andhra Pradesh has the highest wages per worker of the top-5 despite a comparatively small factory count, consistent with a smaller number of large pharmaceutical/API plants (see the JNPC Parawada cluster in the next section) rather than a broad manufacturing base.",
+    jharkhandTitle:null,
+    jharkhandText:null
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Eleven clusters registered, Gujarat home to the most",
+    subhead: "Chemicals has the richest registered cluster set of any sector reviewed in this series so far, spanning Gujarat, Maharashtra, Tamil Nadu, Uttar Pradesh and Andhra Pradesh, and including both bulk-chemical hubs and dedicated pharmaceutical clusters. Confirmed firm-to-firm linkage evidence, however, remains thin across most of them.",
+    clusterChips:[
+      "Ankleshwar-Panoli, Gujarat — ~1,200 units",
+      "Vapi, Gujarat — 277 operational units",
+      "Ahmedabad (Vatva-Naroda-Odhav), Gujarat — ~750 units",
+      "Dahej-Jhagadia, Gujarat — 39 pharma units",
+      "Thane, Maharashtra",
+      "Taloja MIDC, Maharashtra — ~1,080 pharma units",
+      "Tarapur MIDC, Maharashtra — 103 pharma units",
+      "Mahad-Lote-Roha (Konkan belt), Maharashtra",
+      "Cuddalore SIPCOT, Tamil Nadu",
+      "Kannauj, Uttar Pradesh — 375 attar/essential-oil units",
+      "JNPC Parawada, Andhra Pradesh — 90-120 pharma units"
+    ],
+    clusterTable:{
+      note:"Selected principal chemicals clusters with the most complete data. Source: Cluster Supply Chain Linkage Workbook.",
+      cols:["Cluster","State","Units (est.)","Principal products","Linkage verdict"],
+      rows:[
+        ["Ankleshwar-Panoli","Gujarat","~1,200 (750 MSME)","Dyes, pigments, pesticides, petrochemicals, pharma intermediates, paints","Partially linked"],
+        ["Taloja MIDC","Maharashtra","~1,080 pharma units","Pharma formulations, bulk drugs, petrochemicals","Insufficient data"],
+        ["Cuddalore SIPCOT","Tamil Nadu","n/a","Petrochemicals, industrial alcohol, agrochemicals, pharma API, paints","Partially linked"],
+        ["Kannauj","Uttar Pradesh","375 (250 attar + 125 essential oil)","Attar, essential oils","Partially linked"],
+        ["JNPC Parawada","Andhra Pradesh","90-120 (largest in AP)","Bulk drugs, API, formulations","Insufficient data"]
+      ]
+    },
+    note:"Cluster locations track the Geography theme's top states closely for Gujarat, Maharashtra and Tamil Nadu, but Uttar Pradesh and Andhra Pradesh's clusters (Kannauj, JNPC Parawada) are both narrow, specialised hubs, attar/essential oils and pharma API respectively, rather than broad chemicals manufacturing, which is why their overall state GVO share is modest despite hosting well-documented clusters.",
+    noteD:"Of the 11 registered Chemicals clusters, only 5 have a confirmed firm-to-firm transaction logged in the underlying linkage map (Ankleshwar-Panoli, Cuddalore SIPCOT, Kannauj, and two others); the remainder are logged as agglomeration only or insufficient data. This mirrors the pattern seen in Textiles: registration and firm presence are well documented, but supply-chain linkage evidence is thin across most clusters, not a small number of exceptions.",
+    noteE:"Three of the twenty firm slots in the underlying firm-level workbook were left as unfilled placeholders ('enter company name here') and are excluded from the Scale and Trade firm tables in this paper rather than estimated."
+  }
+};
+
+/* =====================================================================
+   THE SECTOR STORY
+   ===================================================================== */
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "India's steadiest big performer, with a trade cushion running out",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Chemicals stands today.",
+  sections: [
+    { h: "The core tension: the strongest IIP performer, but growth has cooled and value-add is thinning", p: [
+      "Chemicals is the standout structural performer among the eleven sectors covered in this series so far: 4th of 11 on IIP level (153.9 in 2025-26, up from a 2012-13 base of 105.6), 4th on full-period CAGR (2.94%), and the least volatile sector of all eleven on the standard deviation of year-on-year growth. It recovered fully from its COVID-year dip within a year and has set new index highs every year since, a sharp contrast with Textiles, which never recovered its pre-COVID peak. Financial performance backs this up: PAT margin rose from 3.2% (2014-15) to 5.7% (2024-25), ROE from 9.1% to 11.2%, and Free Cash Flow more than doubled while staying positive throughout.",
+      "Two softer signals sit underneath that headline strength. First, the sector's most recent year of growth was close to flat (+0.55% in 2025-26), ranking only 8th of 11 sectors on latest-year growth, a marked step down from the CAGR that got it here. Second, and more structurally, the value-added share of Gross Value of Output fell over the decade, from 18.0% (2014-15) to 15.7% (2023-24), even as GVO itself more than doubled. Output is growing faster than the value captured from it, the mirror image of the pattern seen in Textiles, where GVO growth was more modest but value-added share rose."
+    ]},
+    { h: "Trade: a surplus that has nearly vanished", p: [
+      "Chemicals ran a trade surplus of just ₹15,934 crore in FY24-25, down sharply from the levels implied by the mid-decade trade series and now equivalent to little more than 1% of export value. Exports fell 9.8% year-on-year while imports rose 7.1%, and import dependency stands at 49.7%, the highest ratio flagged in this paper series so far. A large share of trade on both sides is refined petroleum products (HS 2710/2711 codes: petroleum oils, LNG, LPG), so global crude and gas price movements are doing real work in these numbers alongside domestic manufacturing competitiveness. China is the dominant single import partner (₹2,07,745 crore), while the USA and Netherlands lead on exports. Reliance Industries and Indian Oil Corporation are the sector's largest exporters in absolute terms, though a scope mismatch in the underlying workbook (their reported chemicals-segment sales appear to undercount total company sales) makes their export-intensity ratios unreliable and they are excluded from the ratio table on that basis."
+    ]},
+    { h: "Investment: a very large pipeline, and a PLI scheme that covers only part of the sector", p: [
+      "Chemicals carries the largest investment pipeline of any sector reviewed in this series: ₹12.70 lakh crore outstanding across 1,101 projects, with a further ₹37.54 lakh crore under implementation. New investment remains overwhelmingly private (₹5,79,770 crore of ₹6,90,391 crore total in 2024-25, roughly 84%), with combined government investment around 12% and foreign private under 4%. The concerning signal here is sharper than in Textiles: dropped-investment cost roughly tripled in a single year, from ₹98,968 crore (2023-24) to ₹2,78,961 crore (2024-25), and the count of dropped projects has climbed every year since 2019-20. On policy: the Production Linked Incentive scheme that touches this sector is scoped specifically to Drugs and Pharmaceuticals (₹2,150.5 crore Revised Estimate expenditure in 2024-25, rising to a ₹2,444.9 crore Budget Estimate for 2025-26); there is no PLI scheme for bulk or basic chemicals, petrochemicals, or plastics. Reading PLI as representative of investment policy for 'Chemicals' as a whole would understate the picture; the pipeline is a private-capital story with a narrow, pharma-specific policy layer on top."
+    ]},
+    { h: "Geography: Gujarat's scale is not matched anywhere else", p: [
+      "Gujarat accounts for 29.1% of the sector's national GVO, more than double its nearest rival Maharashtra (13.1%), and hosts the largest concentration of registered chemical clusters of any state (four of the eleven logged, including Ankleshwar-Panoli, one of the best-documented chemical clusters in the country). Tamil Nadu, Uttar Pradesh and Andhra Pradesh round out the top five, each in the 4.8-5.3% GVO-share range, but Andhra Pradesh stands out on wages per worker (₹3,16,170, the highest of the top five) despite a comparatively small factory count, a pattern consistent with a small number of large pharmaceutical API plants (see JNPC Parawada) rather than a broad manufacturing base. The top-5 states together account for roughly 57% of national output, somewhat less concentrated than Textiles' ~65%, but built around one dominant state rather than a spread."
+    ]},
+    { h: "Clusters: the richest register in this series, linkage evidence still thin", p: [
+      "Eleven Chemicals clusters are formally registered across five states, spanning bulk-chemical hubs (Ankleshwar-Panoli, Vapi, Ahmedabad in Gujarat), petrochemical and bulk-drug complexes (Dahej-Jhagadia, Cuddalore SIPCOT), and dedicated pharmaceutical clusters (Taloja and Tarapur MIDC in Maharashtra, JNPC Parawada in Andhra Pradesh), alongside a narrow, geography-indication-tagged niche (Kannauj attar and essential oils). But of these eleven, only five carry a confirmed firm-to-firm transaction in the underlying linkage map; the rest are logged as agglomeration only or insufficient data, the same pattern of well-documented registration alongside thin linkage evidence seen in Textiles."
+    ]},
+    { h: "R&D: a laggard by the Institute's threshold, but ahead of Textiles", p: [
+      "R&D spend as a share of sales sits at 0.55% in 2024-25, within a narrow 0.47%-0.67% band across the decade, squarely in the 'laggard' band (below 1%) by the Institute's own thresholds. It is nonetheless noticeably higher than Textiles' ~0.10%, reflecting the pharmaceutical component folded into this sector's NIC scope. The PLI scheme's pharma-specific expenditure (₹2,150.5 crore in 2024-25) is a fraction of the sector's aggregate R&D spend (₹24,744.5 crore, all-companies basis), underlining that innovation spend here is overwhelmingly firm-funded rather than policy-subsidised."
+    ]}
+  ],
+  summary: [
+    {n:"+103%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"18.0%→15.7%", l:"GVA share of GVO, 2014-15 → 2023-24"},
+    {n:"0.55%", l:"R&D spend, share of sales (2024-25)"},
+    {n:"₹2,150.5 cr", l:"PLI (Pharma-only) disbursement, 2024-25 RE"},
+    {n:"877.6→779.0", l:"HHI, 2014-15 → 2024-25 (full firm universe)"}
+  ],
+  takeaway: "Chemicals is the strongest all-round IIP performer among the sectors reviewed in this series, steady, consistently within the Competitive HHI band on a full-firm-universe basis, and financially healthier than Textiles on every balance-sheet measure. But that headline strength sits over two softening signals worth watching: output is growing faster than the value added it captures, and a trade surplus that once cushioned the sector has been ground down to almost nothing by imports, mostly refined petroleum and LNG, growing faster than exports. The PLI scheme that touches this sector is real but narrow, scoped only to pharmaceuticals, not to the bulk chemicals and petrochemicals that make up most of the sector's output and investment pipeline.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, 2014-15 to 2023-24.",
+    "Index of Industrial Production, Base 2011-12, Ministry of Statistics and Programme Implementation. Chemicals composite includes Pharmaceuticals (NIC 21) as a weighted component (80.11% Chemicals / 19.89% Pharmaceuticals), not a separate row.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, firm-level panel by sector.",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates, FY14-15 to FY24-25.",
+    "Cluster Supply Chain Linkage Workbook, compiled from SIDBI/SAMEEEKSHA cluster profiles, DCMSME district industrial profiles, MIDC, SIPCOT, and Department of Pharmaceuticals survey sources.",
+    "Central Government Expenditure on Production Linked Incentive (PLI) Scheme: Drugs and Pharmaceuticals, Budget and Revised Estimates, 2021-22 to 2026-27. CMIE, updated 01 Feb 2026.",
+    "CMIE Industry Outlook, Chemicals sector (NIC 19-22), aggregate all-companies basis, 2014-15 to 2024-25."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to 75.1% of item-level manufacturing weight against an official total of 77.6%. The residual is unreconciled sub-group weight and does not affect sectors' relative ranking."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures excludes unclassified trade value rather than estimating it; treat trade figures as directional rather than exact. A large share of this sector's trade value is refined petroleum products (HS 2710/2711), so global energy prices are a major driver of year-to-year swings independent of domestic manufacturing trends."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"The Chemicals sector in this paper follows the CMIE Industry Outlook 'Chemicals' sheet definition (NIC Divisions 19-22), which already includes Personal and Homecare products; this is broader than CMIE's own internal report tree, which files Personal and Homecare under 'Consumer Goods'. This project's NIC-based mapping was used throughout, per prior confirmation."},
+    {tag:"(e)", text:"Reliance Industries Ltd. and Indian Oil Corporation Ltd.'s reported export-intensity ratios in the underlying firm-level workbook exceed 100% in several years, indicating the 'Sales from goods' figure used as the ratio's denominator is scoped to only part of each conglomerate's business. Both firms' absolute export values are reported; their export-intensity ratios are excluded as unreliable rather than reported as-is."},
+    {tag:"(f)", text:"Three of the twenty firm slots in the underlying firm-level workbook, and the entire firm-churn tracker for this sector, were left unfilled at source ('enter company name here' placeholders, blank churn table) and are excluded from this paper's firm tables rather than estimated."},
+    {tag:"(g)", text:"No sector-wide FDI figure for the combined Chemicals definition (NIC 19-22) was available in the sources reviewed; DPIIT's published FDI categories (Chemicals other than fertilisers, Drugs and Pharmaceuticals, Petroleum and Natural Gas) do not sum cleanly to this project's sector definition without further reconciliation, and this figure is flagged as a data gap rather than estimated."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · NIC Divisions 19, 20, 21, 22 · Primary Research: To be asked · Compiled by: Riddhi Bhargava"
+};
+
+/* =====================================================================
+   LAYOUT — canvas positions for each node.
+   ===================================================================== */
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  series.forEach(ser=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`; });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <p class="cc-eyebrow">Chemicals Sector Snapshot</p>
+      <h1 class="cc-title">${c.title}</h1>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">0.55%</div><div class="rnd-label">of sales — R&D spend, 2024-25</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.stats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <div style="margin-top:26px">${table(d.partnersTable)}</div></div></div>
+    <div class="grid1">${table(d.productsTable)}</div>
+    <div class="grid1"><p class="block-title">Firm trade profile, ranked</p>${table(d.firmTable)}
+      <p class="block-note" style="margin-top:12px">${d.scopeNote}</p></div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="rnd-callout" style="margin-top:8px"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap"><div class="rnd-num">${d.rndHighlight.pct}</div><div><div class="rnd-label">${d.rndHighlight.label}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">${d.rndHighlight.band}</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div></div></div><p class="rnd-note" style="margin-top:14px">${d.rndHighlight.note}</p></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <p class="block-title">Registered clusters</p>
+    <div class="chip-row">${d.clusterChips.map(c=>`<div class="chip">${c}</div>`).join("")}</div>
+    <div class="grid1" style="margin-top:30px">${table(d.clusterTable)}</div>
+    <div class="flag" style="margin-top:20px">${d.note}</div>
+    <p class="block-note" style="margin-top:16px"><b>Note (d):</b> ${d.noteD}</p>
+    <p class="block-note" style="margin-top:8px"><b>Note (e):</b> ${d.noteE}</p>
+    </div>`;
+}
+
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Chemicals Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>

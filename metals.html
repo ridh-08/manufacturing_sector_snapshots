@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metals: Scale, Consistency, and a Trade Deficit That Isn't What It Looks Like — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .block-note-wide{font-size:17px;line-height:1.68;opacity:.78;margin:0 0 18px;max-width:1040px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Metals Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Metals",
+    tagline: "India's strongest-performing manufacturing sector on the official output index for over a decade running, and a sector with the largest investment pipeline in this series, but one whose headline trade numbers are dominated by gold and silver, not steel or aluminium.",
+    stats: [
+      {n:"30,487", l:"factories (2023-24)"},
+      {n:"₹26.05 L cr", l:"gross value of output, ASI"},
+      {n:"−₹6.99 L cr", l:"trade deficit, FY24-25 (precious-metals-driven)"},
+      {n:"1 / 11", l:"IIP level and CAGR rank"},
+      {n:"+10.7%", l:"latest IIP growth, 2025-26"},
+      {n:"20.7%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "India's largest sector by output growth, structurally competitive at the top",
+    subhead: "Metals (NIC Divisions 24-25: basic metals and fabricated metal products) has grown output faster than any other sector in this series over the past decade. Concentration briefly spiked on a base-year data artifact, then settled into the competitive band and has stayed there.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, national totals, 2023-24.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","30,487"],
+        ["Factories in operation","24,446"],
+        ["Total persons engaged","23.55 lakh"],
+        ["Gross Value of Output, 2023-24","₹26.05 lakh crore"],
+        ["Gross Value Added, 2023-24","₹3.55 lakh crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [10.26,10.26,10.42,12.58,15.27,14.26,14.51,21.82,25.08,26.05],
+      lineValues: [15.8,13.1,14.6,15.1,14.1,13.8,17.9,18.1,12.9,13.6],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO more than doubled over the decade, from ₹10.26 lakh crore to ₹26.05 lakh crore, a 154% increase, and did so through the sharpest sustained climb of any sector reviewed in this series, output essentially flat from 2014-15 to 2016-17, then rising in nearly every year since. The value-added share of that output was volatile but ended the decade slightly lower (15.8% in 2014-15, 13.6% in 2023-24), with a low of 12.9% in 2022-23 during a commodity-price-driven materials-cost spike. Materials Consumed as a share of GVO rose from 63.5% (2014-15) to 67.6% (2023-24) over the same national ASI series, consistent with a materials-intensive, commodity-cycle-exposed sector."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [28286,28889,29309,28589,28421,29152,29653,28938,29658,30487]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [203.1,223.3,252.0,254.1,233.2,269.0,276.8,263.0,249.3,244.2],
+      band: "Competitive band is HHI < 1,500 — Metals sits well inside it throughout on this full-universe basis, a materially different and lower reading than the previous top-20-panel measure shown on this page (which ranged 969–1,415). This series is computed from every firm reporting positive revenue each year (1,631 firms in 2014-15, falling to 1,389 in 2024-25), not a fixed top-20 panel, so it is not directly comparable to that narrower methodology. The 2018-19 data point is excluded: the source pull's total sector revenue for that year (₹1,53,24,821 million) is roughly 1.8x the surrounding years (₹85,94,387 million in 2017-18, ₹87,77,442 million in 2019-20) and pushes HHI to 1,327.2 and top-3 share to 44.7%, both wildly out of line with every other year in the series (HHI 203–277, top-3 share 17.8%–23.4%), consistent with a source data error rather than a genuine one-year concentration event. Firm count that year (1,596) shows no corresponding anomaly, reinforcing that the revenue figure, not the firm population, is the source of the distortion. On the full-universe basis excluding this point, concentration has moved in a narrow, mildly rising band, HHI from 203.1 (2014-15) to 244.2 (2024-25) and top-3 share from 19.1% to 20.7%, a genuinely stable structure similar in character, though not in absolute level, to the flat pattern the old top-20-panel measure showed."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (national aggregate)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [0.958,1.181,1.163,1.055,0.915,1.086,1.056,0.727,0.670,0.707,0.759],
+      band: "Moderate band is 0.5×–1.5× — Metals sat at the upper edge of moderate through the mid-decade (1.05×–1.18×, 2015-16 to 2019-20), a heavy-industry capital profile consistent with steel and aluminium smelting and rolling capacity, before easing toward the lower half of the band from 2021-22 onward as sales growth outpaced fixed-asset growth."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [59.19,4.26,6.19,30.36],
+      caption: "Raw material cost (59.19% of sales, up from 52.88% in 2014-15) and Power & Fuel (6.19%, among the highest of any sector in this series, reflecting the energy intensity of smelting and rolling) together account for two-thirds of sales. The 30.36% residual 'Other / margin' band includes Royalties & technical fees (1.73% of sales, up sharply from 0.52% a decade earlier), overheads, and PAT margin (6.58% of total income in 2024-25)."
+    },
+    firmTable: {
+      note: "Leading firms by 2024-25 revenue (single-year basis, superseding the previous ratio-only presentation). Source: Prowess IQ, 2026 pull, metals_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. A 6th-ranked entry in the source pull, Atul Sugar Screens Pvt. Ltd. (reported revenue ₹52,311 crore against a company confirmed by external filings to be a 9-employee, ₹2.5 lakh paid-up-capital nickel-screen manufacturer), has been excluded as a corroborated data error and does not affect this top-5 table, since it ranked 6th. R&D % of Sales and Export Intensity are reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["Tata Steel Ltd.","Integrated steel","1,32,517","10.5%","0.25%","4.93%"],
+        ["J S W Steel Ltd.","Integrated steel","1,27,702","4.6%","0.04%","5.82%"],
+        ["Steel Authority Of India Ltd.","Integrated steel (PSU)","1,02,478","2.1%","0.20%","0.48%"],
+        ["Hindalco Industries Ltd.","Aluminium & non-ferrous metals","93,309","6.8%","0.04%","17.84%"],
+        ["Vedanta Ltd.","Diversified metals & mining","74,295","24.1%","—","—"]
+      ]
+    },
+    firmConcNote: "Concentration on the full-universe basis is a materially different, lower reading from the previous top-20-panel measure above, though both point to a genuinely competitive structure. Computed from the full firm universe reporting revenue each year (see chart above and the excluded 2018-19 data point noted there), sector HHI stood at 244.2 in 2024-25, up modestly from 203.1 in 2014-15. The top-3 firms' combined share on this same full-universe basis was 20.7% in 2024-25, up from 19.1% in 2014-15, while the number of reporting firms fell from 1,631 to 1,389 over the same period — a narrow, mildly rising concentration band rather than the flat 969–1,415 range the old panel measure showed, though both agree the sector is not drifting toward consolidation or fragmentation at pace. R&D and export-intensity fields are blank at source only for Vedanta among the top 5 by revenue; the firms that actually lead the sector on R&D and export value and intensity are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, metals_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["Tata Steel Ltd.","328.11"],
+        ["Steel Authority Of India Ltd.","209.39"],
+        ["Godrej & Boyce Mfg. Co. Ltd.","132.38"],
+        ["J S W Steel Ltd.","54.00"],
+        ["Hindalco Industries Ltd.","39.00"]
+      ]
+    },
+    rndByValueNote: "Tata Steel leads by a wide margin in absolute spend (₹328 crore), consistent with its position as the sector's largest firm by revenue, but at only 0.25% of its own sales. None of the five firms on this by-value list appear on the R&D intensity list below; the firms that spend the most in absolute terms and the firms that spend the highest share of sales are two entirely distinct groups in this sector.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25. Source: Prowess IQ, 2026 pull, metals_rnd_leaders.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Modern Malleables Ltd.","1.36","52.31","2.60%"],
+        ["C H W Forge Pvt. Ltd.","14.56","565.60","2.57%"],
+        ["Mishra Dhatu Nigam Ltd.","24.18","1,074.10","2.25%"],
+        ["Inox India Ltd.","20.47","1,296.30","1.58%"],
+        ["Alicon Castalloy Ltd.","19.70","1,525.88","1.29%"]
+      ]
+    },
+    rndLeadersNote: "R&D intensity in Metals is concentrated in smaller specialist firms, forging, castings, cryogenic equipment and specialty alloys, none of which appear among either the top-5-by-revenue or top-5-R&D-by-value tables above. All five clear the 'Active' band (1–3%) without reaching 'Leader' (>3%), a sharp contrast with the sector's largest firms by revenue, which run at 0.04%–0.25% intensity.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, metals_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Hindalco Industries Ltd.","16,642.00"],
+        ["J S W Steel Ltd.","7,432.00"],
+        ["Tata Steel Ltd.","6,532.85"],
+        ["Arcelormittal Nippon Steel India Pvt. Ltd.","2,850.74"],
+        ["Ratnamani Metals & Tubes Ltd.","1,692.94"]
+      ]
+    },
+    exportByValueNote: "Hindalco Industries leads by a wide margin in absolute export value (₹16,642 crore), more than double J S W Steel in second place, and its 17.84% export intensity (from the firm table above) is also the highest of the top-5 revenue firms. Three of the five firms here, Hindalco, JSW Steel and Tata Steel, are also among the sector's top 5 by revenue; none of the five appear on the export-intensity list below, which is led by smaller, near-fully export-oriented firms.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25. Source: Prowess IQ, 2026 pull, metals_export_leaders.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Broadway Overseas Ltd.","199.18","214.06","93.1%"],
+        ["Golden Peakock Overseas Ltd.","93.14","101.24","92.0%"],
+        ["Mcwane India Pvt. Ltd.","213.29","233.05","91.5%"],
+        ["Jakap Metind Pvt. Ltd.","69.06","78.36","88.1%"],
+        ["Sarda Metals & Alloys Ltd.","745.30","908.31","82.1%"]
+      ]
+    },
+    exportLeadersNote: "None of the five export-intensity leaders appear on the by-value export list above; these are smaller, near-fully export-oriented specialist firms rather than the sector's largest exporters in absolute terms. As with R&D, the firms that lead on intensity are entirely distinct from the firms that lead on absolute value.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 1,752 firms reporting in the sector in 2014-15, 344 have stopped reporting entirely and a further 68 are dormant (reporting but with negligible or zero activity), leaving 1,340 still active. Combined churn (stopped-reporting plus dormant) is 412 firms, or 23.5% of the original 2014-15 universe. This 1,752-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year), which is why the two firm counts for FY2014-15 differ slightly (1,752 vs 1,631)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "The strongest and most consistent IIP performer of the eleven sectors",
+    subhead: "Metals ranks 1st of 11 sectors on both IIP level and full-period CAGR, and is the only sector to have stayed above the overall manufacturing index in every single year since the 2011-12 base, a genuinely unmatched combination of scale and consistency among the sectors reviewed in this series.",
+    iipChart: {
+      title: "IIP index, Metals, 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [105.9,110.6,120.5,120.7,126.3,132.8,136.9,147.3,137.5,162.0,173.6,193.2,206.0,228.0],
+      annotations: [
+        {index:8, label:"137.5 (COVID)", color:"var(--thread-madder)"},
+        {index:9, label:"+17.8% (2021-22 rebound)", color:"var(--thread-turmeric)"},
+        {index:13, label:"228.0 (all-time high, latest)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[1.71,2.15,5.25,6.58]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[5.21,5.73,10.62,11.01]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Metals — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2022-23"],
+      rows: [
+        ["Workers per factory","45.1","54.9","59.7"],
+        ["Wages per worker (₹)","1,74,172","2,52,556","2,55,772"],
+        ["Output per worker (₹)","80,47,376","1,37,25,622","1,41,70,463"],
+        ["Productivity–wage ratio","4.08","7.71","5.15"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","1.7%","6.6%"],
+        ["ROE %","5.2%","11.0%"],
+        ["ROCE %","7.5%","12.9%"],
+        ["Debt-to-Equity (×)","1.00","0.47"],
+        ["Interest Cover (×)","1.72","4.63"],
+        ["Current Ratio","1.03","1.05"],
+        ["Free Cash Flow (₹ mn)","20,487","6,52,635"]
+      ]
+    },
+    fcfNote: "Free Cash Flow was volatile through the middle of the decade and improved sharply from 2020-21 onward: essentially breakeven in 2014-15 (₹20,487 million), it peaked at ₹15,87,905 million in 2021-22 during the post-COVID commodity-price surge, before settling to ₹6,52,635 million in 2024-25, still more than 30 times its 2014-15 level.",
+    rndFlag: "R&D spend has stayed at roughly 0.06–0.09% of sales throughout the decade (0.06% in 2024-25) — a clear 'laggard' by the Institute's own thresholds (Leader >3%, Active 1–3%, Laggard <1%), among the lowest R&D intensities of any sector reviewed in this series. This is consistent with Metals being a scale-and-commodity-cycle-driven sector rather than an innovation-intensive one; the sector's IIP-leading performance over the past decade has come from capacity utilisation and price cycles, not product R&D.",
+    narrative: "Metals is the only sector in this 11-sector series classified a 'Consistent Leader' on the Institute's own methodology, above the overall manufacturing index in all 14 years since 2012-13. The index rose from 105.9 (2012-13) to an all-time high of 228.0 in 2025-26, a full-period CAGR of 6.07%, more than double the sector with the next-highest CAGR (Transport Equipment, 3.58%). Metals took a comparatively shallow COVID hit (−6.7% in 2020-21, versus double-digit falls in most other sectors) and then rebounded hard: +17.8% in 2021-22 alone, followed by double-digit growth again in 2023-24 (+11.3%) and 2025-26 (+10.7%). Financial performance has improved in step: PAT margin rose from 1.7% (2014-15) to 6.6% (2024-25), ROE from 5.2% to 11.0%, and Debt-to-Equity roughly halved. The sector ranks mid-table on volatility (9th of 11, meaning less volatile than most), a genuinely rare combination of high growth and relative stability for a commodity-linked sector."
+  },
+
+  investment: {
+    eyebrow: "03 — Investment & PLI",
+    title: "The largest investment pipeline of any sector, with a Steel-specific PLI scheme still ramping",
+    subhead: "Metals carries the largest outstanding investment stock of any sector reviewed in this series, overwhelmingly private and heavily concentrated in Odisha. The PLI scheme covers Specialty Steel specifically, not the sector broadly, and its actual disbursement remains small relative to its Budget Estimates.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[95028,185317,588509]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[98117,185670,168124]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE CapEx database.",
+      cols:["Indicator","Value"],
+      rows:[
+        ["Total investment outstanding","₹27,53,358 cr (915 projects)"],
+        ["Under implementation","₹9,44,096 cr (359 projects)"],
+        ["Implementation stalled","₹2,45,333 cr (63 projects)"],
+        ["Investments completed","₹14,252 cr (54 projects), down from ₹56,834 cr in 2023-24"],
+        ["New investments announced","₹5,88,509 cr (240 projects), up sharply from ₹3,95,168 cr in 2023-24"]
+      ]
+    },
+    dropFlag:"Dropped-investment project count nearly doubled in 2024-25 (65 projects in 2023-24 to 111 in 2024-25) even as dropped-investment cost fell (₹2,44,685 cr to ₹1,68,124 cr), meaning a larger number of smaller projects were dropped rather than a small number of very large ones, a different pattern from the 'a handful of mega-projects' signal seen in some other sectors, and one worth reading as broader-based project attrition. Completed-project value also fell sharply, from ₹56,834 cr (2023-24) to ₹14,252 cr (2024-25), on a similar count (43 to 54 projects), pointing to smaller average project size among what did get finished.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore). States ranked by the sector's actual GVO order (Odisha and Chhattisgarh, both mining-adjacent metals states, feature prominently; Maharashtra and Gujarat lead by absolute GVO scale).",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Odisha","5,06,686","7,50,470","10,17,875"],
+        ["Maharashtra","65,239","64,880","4,06,931"],
+        ["Gujarat","59,941","2,41,883","3,20,250"]
+      ]
+    },
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[16481,0,418611,153417]
+    },
+    ownershipNote:"Indian Private Sector dominates new investment (₹4,18,611 crore of the ₹5,88,509 crore total, roughly 71%); Foreign Private investment is a meaningful ₹1,53,417 crore (26%), among the highest foreign-private shares of any sector in this series; combined government investment is under 3%, and State Government new investment was not recorded for 2024-25 in the source data.",
+    pliNote:"PLI for Specialty Steel carries a Budget Estimate that rises from ₹245.8 crore (2024-25) to ₹305.0 crore (2025-26) to ₹380.0 crore (2026-27), a steadily growing but still modest annual allocation. Actual Revised Estimate spend has come in well below the original Budget Estimate in its early years but is accelerating fast: ₹2.4 crore (2023-24 RE) to ₹55.0 crore (2024-25 RE) to ₹192.5 crore (2025-26 RE), a more than 80-fold rise in Revised Estimate spend over three years, consistent with a scheme still in its early disbursement ramp rather than one that has stalled. There is no broader PLI scheme for basic or non-ferrous metals beyond Specialty Steel; PLI exposure here is narrow, not sector-wide.",
+    fdiNote:"A dedicated FDI figure for the combined Metals sector (NIC 24-25) was not available in the sources reviewed for this paper and is flagged rather than estimated; DPIIT publishes FDI by narrower sub-categories (Metallurgical Industries, Miscellaneous Mechanical & Engineering Industries) that do not sum cleanly to this project's NIC-based sector definition without further reconciliation.",
+    rndHighlight: { pct: "0.06%", label: "R&D spend as share of sales, 2024-25", band: "Laggard (<1%)", note: "The Specialty Steel PLI's 2025-26 Revised Estimate (₹192.5 crore) is a small fraction of the sector's aggregate R&D spend (₹10,602 crore, all-companies basis, 2024-25) but is itself tiny relative to either figure at the whole-sector scale (₹26.05 lakh crore GVO) — R&D here is overwhelmingly firm-funded, and even that funding is thin relative to sector size." },
+    insightBox:"Metals presents a genuinely unusual combination for this series: the largest investment pipeline, the strongest and most consistent IIP performance, and healthy improving firm financials, sitting alongside near-laggard R&D intensity and a PLI scheme scoped narrowly to Specialty Steel rather than the sector as a whole. The sector's decade of leadership appears to be a capacity-and-commodity-cycle story, driven by scale investment (much of it now concentrated in Odisha) and price recovery, rather than a policy-incentive or innovation-led one."
+  },
+
+  trade: {
+    eyebrow: "04 — Trade",
+    title: "A large headline deficit that is mostly gold and silver, not steel",
+    subhead: "Metals shows the largest trade deficit of any sector reviewed in this series by a wide margin, and rising fast. But the underlying products tell a very different story from finished steel or aluminium: precious-metals bullion accounts for roughly half the sector's import value under the HS-to-NIC mapping used here.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[183771,221894,368238,312505,303150,300942,338251]},
+        {name:"Imports", color:"var(--thread-madder)", values:[436591,453880,651321,696221,786437,1000815,1220267]}
+      ]
+    },
+    stats:[
+      {n:"−0.7%", l:"export growth, FY24-25 — flat"},
+      {n:"+27.3%", l:"import growth, FY24-25 — steep"},
+      {n:"76.9%", l:"import dependency"},
+      {n:"10.4%", l:"export 5-year CAGR"},
+      {n:"18.0%", l:"import 5-year CAGR"}
+    ],
+    caveatNote: "This section carries an unusually important caveat, more so than the standard trade-mapping caveat in this series: the single largest import line by far under this sector's HS-to-NIC concordance is HS 710812 ('other unwrought forms', overwhelmingly gold bullion), at roughly ₹4.87 lakh crore in FY24-25, close to half of the sector's total import value, alongside semi-manufactured silver and unwrought platinum. These are precious-metals bullion flows driven by jewellery demand, investment demand and reserve accumulation, not inputs to steel, aluminium or fabricated-metal-products manufacturing. A separate company-financials Net Forex cross-check (the kind used in other papers in this series) was attempted but is omitted here: the underlying CMIE Industry Outlook Forex Earnings/Outgo rows for Metals contain values inconsistent by orders of magnitude with the sector's scale, a source data-quality issue flagged rather than reported unreliably. Readers focused on industrial-metals manufacturing capability should weight the base-metal product lines (aluminium, ferro-alloys, steel structures, scrap) more heavily than the sector's aggregate trade balance, which is overwhelmingly a bullion-trade signal. The underlying HS-to-NIC concordance also maps 95% of export value and 89% of import value to a sector; the remainder is unclassified and excluded rather than estimated.",
+    partnersTable:{
+      note: "Top-5 partners by value, FY24-25",
+      cols:["#","Export partner (₹ cr)","Import partner (₹ cr)"],
+      rows:[
+        [1,"USA — 52,673","UAE — 1,82,763"],
+        [2,"UAE — 20,196","Switzerland — 1,55,255"],
+        [3,"UK — 15,199","China — 78,458"],
+        [4,"Saudi Arabia — 12,339","USA — 42,323"],
+        [5,"China — 8,151","Hong Kong — 35,708"]
+      ]
+    },
+    productsTable:{
+      note: "Top-5 traded products by value, FY24-25. The dominant import line (₹4,87,472 cr) is gold in unwrought form; base-metal industrial products dominate the export side.",
+      cols:["#","Export product (₹ cr)","Import product (₹ cr)"],
+      rows:[
+        [1,"Aluminium, not alloyed — 27,267","Gold, other unwrought forms — 4,87,472"],
+        [2,"Aluminium oxide (non-corundum) — 11,684","Semi-manufactured silver — 36,058"],
+        [3,"Aluminium alloys — 10,057","Aluminium waste and scrap — 33,227"],
+        [4,"Other structures & parts thereof — 8,724","Other waste and scrap — 25,903"],
+        [5,"Ferro-silico-manganese — 8,619","Platinum, unwrought or powder — 23,357"]
+      ]
+    }
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Odisha's mineral base anchors the sector, alongside Maharashtra and Gujarat's fabrication scale",
+    subhead: "Unlike most manufacturing sectors in this series, Metals' geography is shaped by ore and mineral endowment as much as by industrial clustering: Odisha and Chhattisgarh, both mining-adjacent states, rank among the top-5 by output share alongside the more diversified fabrication hubs of Maharashtra and Gujarat.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Maharashtra","Odisha","Gujarat","Chhattisgarh","West Bengal"],
+      values:[353505,322341,304558,225389,193304]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5",
+      xLabel:"State", yLabel:"% of national GVO",
+      labels:["Maharashtra","Odisha","Gujarat","Chhattisgarh","West Bengal"],
+      values:[13.57,12.38,11.69,8.65,7.42]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Maharashtra","Odisha","Gujarat","Chhattisgarh","West Bengal"],
+      values:[272140,325642,216957,276687,269920]
+    },
+    stateTable:{
+      note:"Top-5 states by GVO share, ASI 2023-24 (latest available)",
+      cols:["State","Factories (in operation)","GVO share","Employment share","Wages/worker"],
+      rows:[
+        ["Maharashtra","3,589","13.6%","15.1%","₹2,72,140"],
+        ["Odisha","399","12.4%","9.8%","₹3,25,642"],
+        ["Gujarat","4,269","11.7%","12.3%","₹2,16,957"],
+        ["Chhattisgarh","878","8.7%","6.9%","₹2,76,687"],
+        ["West Bengal","1,245","7.4%","7.3%","₹2,69,920"]
+      ]
+    },
+    flag:"Top-5 states account for ~53.5% of national GVO, the least geographically concentrated top-5 of any sector reviewed in this series so far, consistent with the sector's mix of mineral-endowment-driven states (Odisha, Chhattisgarh, and Jharkhand just outside the top-5 at 7.0% share) and fabrication-and-demand-driven states (Maharashtra, Gujarat). Odisha stands out sharply: the smallest factory count of the top-5 (399) paired with the second-highest GVO share and the highest wages per worker, the clearest signature in this dataset of a small number of very large, capital-intensive integrated plants (steel and alumina) rather than a broad manufacturing base. Jharkhand, though just outside the top-5 by GVO share, records the highest wages per worker of any major Metals state in the underlying data (₹3,71,696 in 2023-24), reinforcing the same large-integrated-plant pattern in another mineral-rich state.",
+    jharkhandTitle:"A note on Odisha's investment concentration",
+    jharkhandText:"Odisha's dominance sharpens further when viewed through the Investment theme: the state accounted for ₹10.18 lakh crore of outstanding Metals investment in 2024-25, more than double Maharashtra and more than three times Gujarat, and its GFCF (Gross Fixed Capital Formation) more than doubled between 2022-23 and 2023-24 alone (₹1,612.7 crore to ₹3,409.2 crore, ASI basis). Odisha's Metals GVO growth has also been unusually steep: from ₹88,333 crore (2014-15) to ₹3,22,341 crore (2023-24), a 265% rise, among the fastest of any major Metals state, consistent with the concentration of new large-scale steel and aluminium capacity in the state over the past decade."
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Five hubs anchored by public-sector steel plants and integrated smelters",
+    subhead: "The sector's best-documented clusters are anchored by large public-sector-legacy steel plants (SAIL Rourkela, Bhilai Steel Plant) and integrated aluminium complexes (NALCO, Vedanta), a different anchor pattern from the private-OEM-led clusters seen in sectors like Transport Equipment.",
+    clusterChips:[
+      "Rourkela, Odisha — ~347 units, anchored by SAIL Rourkela Steel Plant",
+      "Angul, Odisha — ~197 units, anchored by NALCO and Vedanta smelters",
+      "Pune, Maharashtra — ~1,710 foundry & fabrication units",
+      "Rajkot, Gujarat — ~2,380–2,480 foundry units",
+      "Durg, Chhattisgarh — ~455 units, anchored by Bhilai Steel Plant"
+    ],
+    clusterTable:{
+      note:"Principal Metals clusters, selected indicators. Source: Cluster Supply Chain Linkage Workbook.",
+      cols:["Cluster","State","Units (est.)","Turnover (est.)","Anchor firms","Principal products","Export orientation"],
+      rows:[
+        ["Rourkela","Odisha","~347","₹24,000 cr","SAIL Rourkela Steel Plant","Steel, structural fabrication","Yes (Europe, East & SE Asia, Middle East)"],
+        ["Angul","Odisha","~197","₹38,000–42,000 cr","NALCO, Vedanta, Jindal Steel & Power","Aluminium wire rods, ingots, alloy wheels, extrusion profiles","Yes (USA, Germany, Italy, Japan, South Korea, Vietnam, Malaysia)"],
+        ["Pune","Maharashtra","~1,710","₹45,000–50,000 cr","Bharat Forge (Kalyani Group)","Forgings, castings, fabricated metal components","Yes (USA, Germany, Japan, South Korea, UK)"],
+        ["Rajkot","Gujarat","~2,380–2,480","₹5,400 cr","—","Foundry castings","Yes (USA, Germany, Italy, UK, UAE, Saudi Arabia)"],
+        ["Durg","Chhattisgarh","~455","₹29,000 cr","Bhilai Steel Plant","Steel, foundry products","Yes (USA, South Korea, Japan, UAE, Egypt, Malaysia, Vietnam)"]
+      ]
+    },
+    note:"Cluster locations track the Geography theme closely for Odisha, Maharashtra and Gujarat, but the anchor pattern differs sharply from most other sectors in this series: Rourkela, Angul and Durg are all built around a single dominant public-sector-legacy plant (SAIL, NALCO, Bhilai Steel Plant) rather than a spread of competing private firms, while Pune and Rajkot are more conventional multi-firm foundry-and-fabrication hubs.",
+    noteD:"None of the five registered Metals clusters carry a confirmed firm-to-firm transaction in the underlying linkage map; all five are logged as anchor-firm presence only (agglomeration around a single large plant), the same pattern of well-documented registration alongside thin linkage evidence seen throughout this series, though here the 'anchor' itself (SAIL, NALCO, Bhilai Steel) is unusually well identified even where downstream vendor linkages are not.",
+    noteE:"Estimated turnover figures for Rourkela, Angul, Pune and Durg are wide ranges reported in source cluster profiles rather than precise annual figures, and should be read as order-of-magnitude indicators rather than exact values."
+  }
+};
+
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "India's steadiest big winner, with a trade balance that isn't really about metal",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Metals stands today.",
+  sections: [
+    { h: "The core story: the only consistent leader in this eleven-sector series", p: [
+      "Metals is the standout structural performer among all eleven sectors covered in this series: 1st of 11 on IIP level (228.0 in 2025-26, more than doubling its 2012-13 base of 105.9), 1st on full-period CAGR (6.07%, more than 1.7 times the next-highest sector), and the only sector classified a 'Consistent Leader', above the overall manufacturing index in every one of the fourteen years since 2012-13. Factories grew from 28,286 to 30,487 (2014-15 to 2023-24) and Gross Value of Output more than doubled, from ₹10.26 lakh crore to ₹26.05 lakh crore, a 154% rise, with almost all of that growth concentrated from 2017-18 onward.",
+      "Financial performance has strengthened alongside the output story: PAT margin rose from 1.7% (2014-15) to 6.6% (2024-25), ROE from 5.2% to 11.0%, and Debt-to-Equity roughly halved (1.00× to 0.47×). Firm concentration, on the full-firm-universe basis, shows only a narrow, mild rise: HHI moved from 203.1 (2014-15) to 244.2 (2024-25), and top-3 share from 19.1% to 20.7%, staying in the competitive category throughout, a genuinely stable structure rather than the slow consolidation or deconcentration seen in most other sectors reviewed. The one softening signal sits in value capture: the value-added share of GVO ended the decade slightly lower than it started (15.8% in 2014-15 to 13.6% in 2023-24), with Materials Consumed as a share of GVO rising from 63.5% to 67.6% over the same period, a sector producing and selling much more, but not capturing a growing share of that output as value added, consistent with a scale-and-commodity-cycle-driven growth story rather than one built on rising margins per unit."
+    ]},
+    { h: "Trade: the largest deficit in this series, but mostly not about industrial metal", p: [
+      "Metals shows the largest and fastest-widening trade deficit of any sector in this series: −₹6.99 lakh crore in FY24-25, with imports up 27.3% year-on-year against flat exports (−0.7%). Import dependency stands at 76.9%, among the highest of any sector reviewed. But the headline figure carries an unusually important qualification: the single largest import line by far is gold in unwrought form (₹4.87 lakh crore, close to half of total sector imports), alongside semi-manufactured silver and unwrought platinum, precious-metals bullion flows driven by jewellery, investment and reserve demand, not inputs to steel, aluminium or fabricated-metal manufacturing. On the export side, the picture is a genuine industrial-metals story: aluminium (unalloyed and alloyed), aluminium oxide, structural-metal products and ferro-silico-manganese lead the list, with the USA, UAE and UK as the top-3 export partners. Reading this sector's trade balance as a signal about India's industrial-metals competitiveness would significantly overstate the deficit; reading the underlying product mix tells a materially different and more balanced story."
+    ]},
+    { h: "Investment: the largest pipeline in this series, concentrated in Odisha", p: [
+      "Metals carries the largest outstanding investment stock of any sector reviewed here: ₹27.53 lakh crore across 915 projects, with a further ₹9.44 lakh crore under implementation. New investment nearly tripled year-on-year (₹3.95 lakh crore in 2023-24 to ₹5.89 lakh crore in 2024-25), overwhelmingly private (71% Indian Private, 26% Foreign Private, among the highest foreign-private shares in this series). Odisha alone accounted for ₹10.18 lakh crore of outstanding investment in 2024-25, more than double Maharashtra and more than three times Gujarat, reinforcing the state's role as the sector's single largest capacity-expansion hub. A worth-watching signal: dropped-investment project count nearly doubled in 2024-25 (65 to 111 projects) even as dropped-investment cost fell, pointing to broader-based attrition among smaller projects rather than a small number of large cancellations. On policy: the PLI scheme covers Specialty Steel specifically, with Revised Estimate spend rising more than 80-fold in three years (₹2.4 crore in 2023-24 to a projected ₹192.5 crore in 2025-26) but still small relative to the sector's overall investment and R&D scale; there is no PLI scheme for basic or non-ferrous metals beyond this narrow Specialty Steel allocation."
+    ]},
+    { h: "Geography: mineral endowment, not just industrial clustering", p: [
+      "Metals' geography looks different from most sectors in this series: Odisha (12.4% GVO share) and Chhattisgarh (8.7%), both mining-adjacent states, sit alongside the more conventional fabrication hubs of Maharashtra (13.6%, the largest by share) and Gujarat (11.7%) in the top five, with West Bengal rounding out the group (7.4%). The top-5 states together account for only ~53.5% of national output, the least geographically concentrated top-5 of any sector in this series, a sign that Metals manufacturing is genuinely more distributed across the country than sectors like Transport Equipment or Textiles. Odisha stands out sharply within this picture: the smallest factory count of the top-5 (399) paired with the second-highest GVO share and the highest wages per worker (₹3,25,642), the clearest signature of a small number of very large integrated steel and alumina plants rather than a broad manufacturing base, a pattern investment data reinforces directly given the state's outsized share of the national pipeline."
+    ]},
+    { h: "Clusters: anchored by public-sector legacy plants, linkage evidence still thin", p: [
+      "Five major clusters are registered, and unlike most other sectors in this series, three of the five (Rourkela, Angul, Durg) are built around a single dominant, often public-sector-legacy anchor plant, SAIL Rourkela Steel Plant, the NALCO/Vedanta aluminium complex, and Bhilai Steel Plant respectively, rather than a spread of competing private firms. Pune and Rajkot are more conventional multi-firm foundry-and-fabrication hubs. As with other sectors in this series, none of the five clusters carry a confirmed firm-to-firm supply-chain transaction in the underlying linkage map; all are logged as anchor-firm presence only. This is a genuine data gap, not a finding about the sector, these integrated plants almost certainly anchor extensive local vendor ecosystems, it simply is not yet captured in the underlying workbook."
+    ]},
+    { h: "R&D: a laggard, consistent with a scale-and-cycle-driven sector", p: [
+      "R&D spend as a share of sales has sat at roughly 0.06–0.09% throughout the decade, among the lowest R&D intensities of any sector in this series and squarely in the 'laggard' band (below 1%). Read alongside the sector's IIP-leading performance, this reinforces a consistent picture: Metals' decade of outperformance has been driven by capacity investment, capacity utilisation and favourable commodity-price cycles rather than by product innovation or R&D-led differentiation, a structural feature of the sector rather than a policy or firm-level failing, but a real constraint on how much of the sector's competitiveness rests on anything other than scale and cost position."
+    ]}
+  ],
+  summary: [
+    {n:"+154%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"228.0", l:"IIP index, all-time high, 2025-26 (rank 1 of 11)"},
+    {n:"0.06%", l:"R&D spend, share of sales (2024-25)"},
+    {n:"₹192.5 cr", l:"PLI (Specialty Steel) Revised Estimate, 2025-26"},
+    {n:"203.1→244.2", l:"HHI, 2014-15 → 2024-25 (full firm universe)"}
+  ],
+  takeaway: "Metals is the most consistent structural performer in this eleven-sector series: the highest IIP level, the highest full-period CAGR, the only sector never to have fallen below the overall manufacturing index, and the largest investment pipeline, achieved with a genuinely stable, competitive firm structure rather than either rising concentration or fragmentation. The sector's two open questions sit in the same place they do for several others in this series: R&D intensity is a clear laggard even by this project's already-modest benchmarks, and value-added share of output has drifted slightly down even as output itself has surged. The headline trade deficit, meanwhile, is the single most misleading top-line number in this dataset if read at face value, it is overwhelmingly a gold and silver bullion story, not a signal about India's industrial-metals competitiveness, which on the export side (aluminium, ferro-alloys, structural products) looks considerably healthier than the aggregate balance suggests.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, 2014-15 to 2023-24.",
+    "Index of Industrial Production, Base 2011-12, Ministry of Statistics and Programme Implementation.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, firm-level panel by sector, FY22-23 to FY24-25.",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates and CapEx Investment Pipeline database, FY14-15 to FY24-25.",
+    "Cluster Supply Chain Linkage Workbook, compiled from DCMSME district industrial profiles, SAMEEKSHA cluster profiles, and Odisha and Chhattisgarh state industries department sources.",
+    "Central Government Expenditure on Production Linked Incentive (PLI) Scheme: Specialty Steel, Budget and Revised Estimates, 2023-24 to 2026-27. CMIE, updated 01 Feb 2026.",
+    "CMIE Industry Outlook, Metals sector, aggregate all-companies basis, 2014-15 to 2024-25."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to 75.1% of item-level manufacturing weight against an official total of 77.6%. The residual is unreconciled sub-group weight and does not affect this sector's own index level or growth figures."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures maps 95% of export value and 89% of import value to a sector; the remainder is unclassified and excluded rather than estimated. This sector carries an unusually important additional caveat: its largest single import line (HS 710812, overwhelmingly gold bullion) is a precious-metals trade flow, not an input to industrial metals manufacturing, and dominates the aggregate trade balance."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"The Scale & Firm Structure HHI series was rebuilt on a full-firm-universe basis (Prowess IQ, 2026 pull), superseding the previous top-20-panel measure; the two are not directly comparable. Within this new series, the 2018-19 data point is excluded: that year's source-pull total sector revenue is roughly 1.8x the surrounding years and implausibly pushes HHI to 1,327.2 and top-3 share to 44.7%, consistent with a source data error rather than a genuine one-year concentration event."},
+    {tag:"(e)", text:"The Scale & Firm Structure firm table was rebuilt from the Prowess IQ 2026 pull (top-10 revenue indicators), superseding the previous firm scorecard, which had an internally inconsistent absolute sales-value column omitted from that earlier version. A 6th-ranked entry in the new pull, Atul Sugar Screens Pvt. Ltd., was excluded as a corroborated data error (reported revenue inconsistent with the firm's actual scale per external filings); it ranked below the top 5 and does not affect the table shown."},
+    {tag:"(f)", text:"No dedicated FDI figure for the combined Metals sector (NIC 24-25) was available in the sources reviewed; DPIIT's published FDI categories do not sum cleanly to this project's sector definition without further reconciliation, and this figure is flagged as a data gap rather than estimated."},
+    {tag:"(g)", text:"The 'Metals' tab in the underlying ASI state-workbook (Sectorwise_State_Analysis) carries a stale header label reading 'Food & Agro-based Products, NIC Div 10, 11, 12' on most state blocks; this was confirmed to be a copy-paste labelling artifact rather than a genuine data-scope error, the underlying rows are genuine Metals (NIC 24-25) data, consistent with the correctly-labelled Bihar block in the same tab."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · NIC Divisions 24, 25 · Primary Research: To be asked · Compiled by: Riddhi Bhargava"
+};
+
+/* =====================================================================
+   LAYOUT — canvas positions for each node.
+   ===================================================================== */
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+/* Value labels on bars/points must stay compact but exact-ish; short-form
+   for big absolute figures, one-decimal for anything under 1000. */
+function fmtVal(v){
+  if(Math.abs(v)>=1000) return fmtShort(v);
+  if(Number.isInteger(v)) return v.toString();
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  const multi = series.length>1;
+  series.forEach((ser,si)=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`;
+      const above = multi ? (si%2===0) : true;
+      const ly = above ? y-12 : y+20;
+      s+=`<text class="value-label" x="${x}" y="${ly}" text-anchor="middle" fill="${ser.color}">${fmtVal(v)}</text>`;
+    });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<text class="bar-value-label" x="${cx}" y="${y-10}" text-anchor="middle">${fmtVal(v)}${cfg.valueSuffix||''}</text>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <p class="cc-eyebrow">Metals Sector Snapshot</p>
+      <h1 class="cc-title">${c.title}</h1>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">0.06%</div><div class="rnd-label">of sales — R&D spend, 2024-25</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.stats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <div style="margin-top:26px">${table(d.partnersTable)}</div></div></div>
+    <div class="grid1">${table(d.productsTable)}</div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="rnd-callout" style="margin-top:8px"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap"><div class="rnd-num">${d.rndHighlight.pct}</div><div><div class="rnd-label">${d.rndHighlight.label}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">${d.rndHighlight.band}</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div></div></div><p class="rnd-note" style="margin-top:14px">${d.rndHighlight.note}</p></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    <h3 style="font-family:var(--display);font-size:25px;font-weight:600;margin:36px 0 10px;color:var(--thread-indigo)">${d.jharkhandTitle}</h3>
+    <p class="narrative" style="font-size:18px">${d.jharkhandText}</p>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <p class="block-title">Registered clusters</p>
+    <div class="chip-row">${d.clusterChips.map(c=>`<div class="chip">${c}</div>`).join("")}</div>
+    <div class="grid1" style="margin-top:30px">${table(d.clusterTable)}</div>
+    <div class="flag" style="margin-top:20px">${d.note}</div>
+    <p class="block-note" style="margin-top:16px"><b>Note (d):</b> ${d.noteD}</p>
+    <p class="block-note" style="margin-top:8px"><b>Note (e):</b> ${d.noteE}</p>
+    </div>`;
+}
+
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Metals Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>

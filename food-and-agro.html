@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Food and Agro: Scale Without Value Capture — Sector Snapshot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     DESIGN TOKENS — change palette / type here, nowhere else
+     ============================================================ */
+  :root{
+    --ink:#181611;              /* primary text */
+    --card:#e9e1cd;            /* canvas background, unbleached cotton */
+    --paper:#f2ede1;             /* node card background */
+    --thread-indigo:#26344a;    /* indigo dye — structure */
+    --thread-madder:#9a2b1f;    /* madder red — performance/trade */
+    --thread-turmeric:#b8842a;  /* turmeric — investment/geography */
+    --thread-teal:#3c6a5f;      /* teal — clusters/story */
+    --maroon:#9a2b1f;           /* deep maroon — chart axes & emphasis */
+    --maroon-soft:#b8483a;      /* lighter maroon for secondary marks */
+    --line-soft: rgba(24,22,17,0.14);
+    --line-strong: rgba(24,22,17,0.5);
+    --display: 'Fraunces', serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--body);}
+
+  /* ============================================================
+     STAGE — the viewport-height window onto the canvas.
+     Sits in normal document flow; the Sector Story lives below it
+     in ordinary scroll, not inside the zoom canvas.
+     ============================================================ */
+  #stage{position:relative;width:100%;height:100vh;overflow:hidden;cursor:grab;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(43,58,85,0.07), transparent 42%),
+      radial-gradient(circle at 82% 12%, rgba(192,138,46,0.06), transparent 38%),
+      radial-gradient(circle at 80% 88%, rgba(163,64,47,0.07), transparent 42%),
+      radial-gradient(circle at 12% 85%, rgba(60,110,100,0.06), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(-45deg, rgba(32,34,31,0.025) 0 1px, transparent 1px 26px),
+      var(--paper);
+  }
+  #stage.dragging{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;transition:transform 900ms cubic-bezier(.16,.84,.44,1);}
+
+  #threads{position:absolute;top:0;left:0;pointer-events:none;}
+
+  /* ============================================================
+     NODE CARDS
+     ============================================================ */
+  .node{position:absolute;background:var(--card);border:1px solid var(--line-strong);border-radius:2px;
+    box-shadow:0 6px 16px -10px rgba(24,22,17,0.28);overflow:hidden;transition:box-shadow 260ms ease,transform 260ms ease,border-color 260ms ease;}
+  .node:not(.center):hover{box-shadow:0 10px 24px -12px rgba(24,22,17,0.35);border-color:var(--ink);transform:translateY(-4px);}
+  .node.center{box-shadow:0 0 0 6px rgba(24,22,17,0.05),0 10px 28px -14px rgba(24,22,17,0.35);}
+  .node.center{border-color:var(--ink);border-width:2px;}
+  .node-hit{position:absolute;inset:0;cursor:pointer;z-index:5;}
+  .node.active .node-hit{display:none;}
+  .node.active{cursor:default;}
+
+  .eyebrow{font-family:var(--mono);font-size:16px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin:0 0 6px;}
+  .node h1{font-family:var(--display);font-weight:600;margin:0 0 10px;line-height:1.05;}
+  .node .kicker-num{font-family:var(--mono);font-size:14px;opacity:.5;}
+
+  /* ---------------------------------------------------------
+     CENTER COVER — mirrors the satellite covers: big, bold,
+     legible from across the whole shrunk-down bird's-eye view.
+     The full preview (title/tagline/stats) only appears once
+     the center node is active (i.e. actually zoomed into).
+     --------------------------------------------------------- */
+  .center-cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:40px;background:var(--card);opacity:1;
+    transition:opacity 420ms ease;}
+  .center-cover .cc-eyebrow{font-family:var(--mono);font-size:22px;letter-spacing:.06em;text-transform:uppercase;
+    opacity:.55;margin:0 0 18px;}
+  .center-cover .cc-title{font-family:var(--display);font-weight:700;font-size:118px;line-height:1;margin:0;color:var(--ink);}
+  .center-cover .cc-cta{margin-top:44px;display:inline-flex;align-items:center;gap:14px;background:var(--ink);
+    color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
+    border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
+    box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  .node.center.active .center-cover{opacity:0;pointer-events:none;}
+
+  /* central node content */
+  .preview{position:absolute;inset:0;padding:56px 60px;display:flex;flex-direction:column;justify-content:center;
+    align-items:center;text-align:center;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.center.active .preview{opacity:1;pointer-events:auto;}
+  .preview h1{font-size:76px;}
+  .preview .tagline{font-size:22px;max-width:640px;opacity:.75;margin-top:6px;}
+  .preview .stat-row{display:flex;gap:44px;margin-top:26px;justify-content:center;flex-wrap:wrap;}
+  .preview .stat{font-family:var(--mono);}
+  .preview .stat .n{font-size:34px;font-weight:600;display:block;}
+  .preview .stat .l{font-size:14px;opacity:.6;}
+  .cta-btn{margin-top:34px;background:var(--thread-indigo);color:var(--card);border:none;border-radius:2px;
+    padding:14px 28px;font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;
+    box-shadow:none;}
+  .cta-btn:hover{background:#1c273b;}
+
+  /* ---------------------------------------------------------
+     COVER — what a satellite shows at bird's-eye view. Plain,
+     legible from a distance: number + theme name, nothing else.
+     --------------------------------------------------------- */
+  .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px;background:var(--card);opacity:1;transition:opacity 420ms ease;}
+  .cover::before{content:"";position:absolute;top:0;left:0;right:0;height:12px;background:var(--accent);}
+  .cover::after{content:"";position:absolute;top:26px;right:26px;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);opacity:.5;}
+  /* Sized large on purpose: the overview shows the whole ring scaled down to fit the
+     screen, so these need to survive that shrink and still read clearly at a glance. */
+  .cover-num{font-family:var(--display);font-weight:700;font-size:130px;line-height:1;color:var(--accent);margin-bottom:16px;}
+  .cover-label{font-family:var(--display);font-weight:600;font-size:70px;line-height:1.16;max-width:900px;margin:0;}
+  .cover-arrow{margin-top:38px;font-family:var(--mono);font-size:28px;opacity:.42;}
+  .node.active .cover{opacity:0;pointer-events:none;}
+
+  /* ---------------------------------------------------------
+     DETAIL — full content, revealed once a node is active.
+     Scrolls internally if content runs long; the box itself
+     stays a fixed, sane height rather than growing forever.
+     --------------------------------------------------------- */
+  .detail-wrap{position:absolute;inset:0;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity 420ms ease 80ms;}
+  .node.active .detail-wrap{opacity:1;pointer-events:auto;}
+  .detail-wrap::-webkit-scrollbar{width:9px;}
+  .detail-wrap::-webkit-scrollbar-thumb{background:var(--line-soft);border-radius:8px;}
+  .detail-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-strong);}
+
+  .detail{padding:68px 76px 8px;}
+  .detail .theme-label{font-family:var(--mono);font-size:15px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;}
+  .detail h2{font-family:var(--display);font-weight:600;font-size:50px;margin:8px 0 14px;line-height:1.08;}
+  .detail .subhead{font-size:21px;line-height:1.6;opacity:.8;max-width:840px;margin-bottom:46px;}
+  .detail .grid2{display:grid;grid-template-columns:1fr 1fr;gap:56px;margin-bottom:52px;align-items:start;}
+  .detail .grid1{margin-bottom:52px;}
+  .block-title{font-family:var(--display);font-size:25px;font-weight:600;margin:0 0 10px;}
+  .block-note{font-size:16px;line-height:1.55;opacity:.72;margin:0 0 18px;max-width:760px;}
+  .block-note-wide{font-size:17px;line-height:1.68;opacity:.78;margin:0 0 18px;max-width:1040px;}
+  .flag{background:rgba(154,43,31,0.08);border-left:3px solid var(--thread-madder);padding:20px 24px;
+    font-size:17px;line-height:1.6;margin:16px 0 0;border-radius:0;}
+  .flag b{color:var(--thread-madder);}
+
+  .insight-box{border-left:3px solid var(--thread-turmeric);padding:18px 22px;margin:16px 0 0;
+    background:rgba(184,132,42,0.08);border-radius:0;}
+  .insight-box .label{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--thread-turmeric);font-weight:600;margin-bottom:6px;}
+  .insight-box p{margin:0;font-size:16px;line-height:1.55;font-family:var(--display);color:var(--ink);}
+
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;background:var(--paper);
+    border:1.5px solid var(--ink);border-radius:0;padding:20px 22px 6px;}
+  table{border-collapse:collapse;width:100%;font-size:16px;min-width:420px;}
+  th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line-soft);font-size:16px;
+    white-space:normal;vertical-align:top;}
+  thead th{border-bottom:2px solid var(--ink);}
+  th{font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.04em;opacity:.7;font-weight:600;white-space:normal;line-height:1.35;}
+  td.num,th.num{text-align:right;font-family:var(--mono);} 
+  td.num{white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+
+  .chip-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .chip{background:rgba(24,22,17,.05);border:1px solid var(--line-strong);border-radius:2px;padding:9px 18px;font-size:15px;}
+
+  .narrative{font-family:var(--display);font-size:20px;line-height:1.75;max-width:900px;}
+  .narrative p{margin:0 0 18px;}
+
+  /* footer nav inside each satellite's scrollable detail */
+  .detail-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:26px 76px 44px;border-top:1px solid var(--line-soft);margin-top:8px;}
+  .nav-btn{background:none;border:1px solid var(--line-strong);border-radius:2px;padding:11px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;cursor:pointer;color:var(--ink);}
+  .nav-btn:hover{border-color:var(--line-strong);}
+  .nav-btn.primary{background:var(--thread-indigo);color:var(--card);border-color:var(--thread-indigo);}
+  .nav-btn.primary:hover{background:#1c273b;}
+
+  /* ============================================================
+     CHARTS — prominent, maroon-framed axes with clearly legible
+     labels. Tick labels are fully opaque and sized up; axis
+     lines and axis titles use deep maroon for emphasis.
+     ============================================================ */
+  .chart-frame{background:var(--paper);border-top:3px solid var(--ink);border-bottom:1.5px solid var(--ink);
+    border-left:none;border-right:none;border-radius:0;padding:22px 14px 16px;}
+  svg text{font-family:var(--mono);fill:var(--ink);font-size:19px;}
+  .axis-line{stroke:var(--maroon);stroke-width:3.2;opacity:1;}
+  .axis-tick{stroke:var(--maroon);stroke-width:2.6;opacity:1;}
+  .grid-line{stroke:rgba(32,34,31,0.22);stroke-width:1.3;opacity:.8;}
+  .axis-label{font-size:19px;opacity:1;font-weight:600;fill:var(--maroon);letter-spacing:.01em;}
+  .tick-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);letter-spacing:0;}
+  .chart-title{font-family:var(--display);font-size:26px;font-weight:600;fill:var(--ink);}
+  .legend-label{font-size:18px;opacity:1;font-weight:500;fill:var(--ink);}
+  .anno-text{font-size:17px;font-weight:700;fill:var(--thread-turmeric);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  .anno-text.down{fill:var(--thread-madder);}
+  .anno-text.latest{fill:var(--thread-indigo);}
+  .value-label{font-size:16px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;}
+  /* ============================================================
+     HUD — controls (fixed over the stage, fades once you scroll
+     past it into the Sector Story)
+     ============================================================ */
+  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+    justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
+  #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
+  #hud-right{display:flex;align-items:center;gap:10px;}
+  .hud-btn{background:var(--thread-indigo);color:var(--card);border:none;border-radius:30px;padding:11px 22px;
+    font-family:var(--mono);font-size:14px;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;
+    gap:8px;box-shadow:0 8px 20px -8px rgba(43,58,85,.6);}
+  .hud-btn:hover{background:#1c273b;}
+  .hud-btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line-soft);box-shadow:none;}
+  .hud-btn.ghost:hover{border-color:var(--line-strong);}
+  .hidden{display:none !important;}
+  #breadcrumb{font-size:14px;opacity:.65;letter-spacing:.03em;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:38vw;}
+  #breadcrumb b{opacity:1;color:var(--thread-madder);}
+
+  #bottom-bar{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:50;
+    display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity 300ms ease;}
+  #bottom-bar.hidden{opacity:0;pointer-events:none;}
+  #hint{font-family:var(--mono);font-size:13px;opacity:.5;letter-spacing:.02em;pointer-events:none;text-align:center;}
+  #scroll-cta{background:var(--card);border:1px solid var(--line-soft);border-radius:24px;padding:10px 20px;
+    font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
+    box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
+  #scroll-cta:hover{border-color:var(--line-strong);}
+  .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     ZOOM RAIL — fixed + / − controls on the right edge of the stage.
+     Fades together with the HUD once you scroll into the story.
+     ============================================================ */
+  #zoom-rail{position:fixed;top:50%;right:22px;transform:translateY(-50%);z-index:50;
+    display:flex;flex-direction:column;gap:8px;transition:opacity 300ms ease;}
+  #zoom-rail.faded{opacity:0;pointer-events:none;}
+  .zoom-btn{width:46px;height:46px;border-radius:50%;background:var(--card);border:1px solid var(--line-soft);
+    color:var(--ink);font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -10px rgba(32,34,31,0.4);
+    transition:background 180ms ease,border-color 180ms ease,transform 160ms ease;}
+  .zoom-btn:hover{border-color:var(--maroon);color:var(--maroon);transform:scale(1.06);}
+  .zoom-btn:active{transform:scale(.96);}
+  .zoom-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;border-color:var(--line-soft);color:var(--ink);}
+  #zoom-level{font-family:var(--mono);font-size:11px;opacity:.6;text-align:center;margin-top:2px;letter-spacing:.02em;}
+
+  /* ============================================================
+     SECTOR STORY — ordinary page content below the canvas, meant
+     to be read by anyone regardless of whether they click through
+     the mindmap.
+     ============================================================ */
+  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
+  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+    opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
+  .back-to-top:hover{opacity:1;}
+  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
+    text-align:center;margin:0 0 12px;}
+  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
+    margin:0 0 22px;line-height:1.12;}
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
+    max-width:600px;margin:0 auto 72px;}
+  .story-block{margin-bottom:50px;}
+  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
+  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
+    background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
+  .story-takeaway b{color:var(--thread-madder);}
+
+  /* summary stat grid */
+  .summary-grid{display:flex;flex-wrap:wrap;gap:24px 36px;margin:32px 0 12px;padding-top:20px;border-top:1px solid var(--line-soft);}
+  .summary-grid > div{flex:1 1 120px;min-width:110px;}
+  .summary-grid .num{font-family:var(--mono);font-weight:600;font-size:1.3rem;color:var(--thread-indigo);display:block;line-height:1.15;}
+  .summary-grid .lbl{font-family:var(--mono);font-size:10px;color:var(--ink);opacity:.6;text-transform:uppercase;letter-spacing:.02em;margin-top:7px;display:block;line-height:1.35;}
+
+  /* R&D callout block */
+  .rnd-callout{background:rgba(43,58,85,0.06);border:1.5px solid rgba(43,58,85,0.18);border-radius:10px;padding:28px 26px 22px;}
+  .rnd-num{font-family:var(--display);font-weight:700;font-size:56px;line-height:1;color:var(--thread-indigo);margin-bottom:6px;}
+  .rnd-label{font-family:var(--body);font-size:16px;opacity:.75;margin-bottom:18px;}
+  .rnd-bands{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .rnd-band{font-family:var(--body);font-size:13px;font-weight:500;padding:6px 14px;border-radius:20px;background:var(--card);border:1px solid var(--line-soft);opacity:.5;}
+  .rnd-band.active{opacity:1;background:rgba(163,64,47,0.12);border-color:var(--thread-madder);color:var(--thread-madder);font-weight:600;}
+  .rnd-active{}
+  .rnd-leader{}
+  .rnd-note{font-family:var(--body);font-size:15px;line-height:1.6;opacity:.75;margin:0;}
+
+  /* Trade KPI cards */
+  .trade-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;}
+  .trade-kpi{background:rgba(43,58,85,0.05);border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;}
+  .trade-kpi-n{font-family:var(--display);font-weight:700;font-size:26px;color:var(--thread-indigo);display:block;line-height:1.1;}
+  .trade-kpi-l{font-family:var(--body);font-size:13px;opacity:.7;letter-spacing:.01em;margin-top:6px;display:block;line-height:1.4;}
+
+  /* references / notes / colophon */
+  .story-footer{margin-top:64px;padding-top:28px;border-top:2px solid var(--ink);}
+  .story-footer h4{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--maroon);margin:0 0 12px;font-weight:700;}
+  .ref-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;counter-reset:refnum;}
+  .ref-list li{counter-increment:refnum;padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .ref-list li:last-child{border-bottom:none;}
+  .ref-list li::before{content:"[" counter(refnum) "]";position:absolute;left:0;font-family:var(--mono);color:var(--maroon);font-size:11px;font-weight:600;}
+  .note-list{list-style:none;margin:0 0 28px;padding:0;font-size:13px;line-height:1.6;color:var(--ink);opacity:.7;}
+  .note-list li{padding:6px 0 6px 28px;position:relative;border-bottom:1px solid var(--line-soft);}
+  .note-list li:last-child{border-bottom:none;}
+  .note-list li .tag{position:absolute;left:0;font-family:var(--mono);color:var(--thread-indigo);font-size:11px;font-weight:700;}
+  .colophon{font-family:var(--mono);font-size:10.5px;color:var(--ink);opacity:.5;margin-top:24px;padding-top:16px;border-top:1px solid var(--line-soft);line-height:1.6;}
+
+  @media (max-width:720px){
+    #hud{flex-direction:column;align-items:flex-start;}
+    .detail{padding:48px 30px 8px;}
+    .detail .grid2{grid-template-columns:1fr;gap:36px;}
+    .detail-nav{padding:20px 30px 32px;}
+    .cover-label{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<div id="hud">
+  <div id="hud-left">
+    <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
+    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
+    <div id="breadcrumb">Food and Agro Sector Snapshot</div>
+  </div>
+  <div id="hud-right">
+    <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
+    <button id="next-btn" class="hud-btn hidden" onclick="goNext()">Next →</button>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div id="hint">Click any node to explore · drag to pan · use + / − to zoom</div>
+  <button id="scroll-cta" onclick="scrollToStory()">Read the Sector Story ↓</button>
+</div>
+
+<div id="zoom-rail">
+  <button class="zoom-btn" id="zoom-in" aria-label="Zoom in" onclick="zoomByButton(1.2)">+</button>
+  <button class="zoom-btn" id="zoom-out" aria-label="Zoom out" onclick="zoomByButton(1/1.2)">−</button>
+  <div id="zoom-level">100%</div>
+  <button class="zoom-btn" id="zoom-reset" aria-label="Reset zoom" onclick="zoomReset()" style="font-size:16px">⤢</button>
+</div>
+
+<div id="stage">
+  <div id="world">
+    <svg id="threads"></svg>
+    <!-- node DOM elements are injected by JS from DATA/LAYOUT below -->
+  </div>
+</div>
+
+<section id="story-section"></section>
+
+<script>
+/* =====================================================================
+   EDIT ME — every number, label and sentence in the mindmap lives here.
+   ===================================================================== */
+const DATA = {
+
+  center: {
+    eyebrow: "Institute of Manufacturing and Economy — Sector Snapshot",
+    title: "Food and Agro",
+    tagline: "India's largest manufacturing sector by factory count and among its steadiest, but a sector where scale has not translated into value capture, a modest and shrinking export surplus, and a firm register still dominated by branded FMCG and beverages rather than food processing depth.",
+    stats: [
+      {n:"47,238", l:"factories (2023-24)"},
+      {n:"₹22.41 L cr", l:"gross value of output"},
+      {n:"₹1.20 L cr", l:"trade surplus, FY24-25"},
+      {n:"8 / 11", l:"IIP level rank"},
+      {n:"+0.80%", l:"latest IIP growth, 2025-26"},
+      {n:"12.1%", l:"top-3 firms' market share, FY24-25 (full-universe basis)"}
+    ]
+  },
+
+  scale: {
+    eyebrow: "01 — Scale & Firm Structure",
+    title: "The largest factory base of any sector, steadily deconcentrating",
+    subhead: "Food and Agro (NIC Divisions 10, 11, 12: food products, beverages, tobacco) has the highest factory count of any sector in this series. Output has more than doubled over the decade, but the value-added share of that output has drifted down, not up, and the market has grown less concentrated rather than more.",
+    scaleTable: {
+      note: "Scale indicators, Annual Survey of Industries, national totals, 2023-24.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Factories registered","47,238"],
+        ["Factories in operation","39,560"],
+        ["Total persons engaged","27.90 lakh"],
+        ["Gross Value of Output, 2023-24","₹22.41 lakh crore"],
+        ["Gross Value Added, 2023-24","₹2.39 lakh crore"]
+      ]
+    },
+    gvoGvaChart: {
+      title: "Gross Value of Output (bars) and value-added intensity (line), 2014-15 to 2023-24",
+      xLabel: "Year", yLabel: "GVO (₹ lakh cr)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      barValues: [9.75,9.86,11.39,12.30,13.29,13.78,15.01,16.78,19.85,22.41],
+      lineValues: [11.0,12.5,12.2,12.0,11.6,11.3,11.3,10.8,10.5,10.7],
+      lineLabel: "GVA ÷ GVO %",
+      caption: "GVO rose 129.9% over the decade (₹9.75 lakh crore to ₹22.41 lakh crore, 2014-15 to 2023-24), a steadier climb than the step-change pattern seen in some other sectors. But the value-added share of that output drifted down from 11.0% (2014-15) to a low of 10.5% (2022-23) before ticking up slightly to 10.7% (2023-24) — the sector is producing much more without capturing a correspondingly larger share of it as value added."
+    },
+    factoryChart: {
+      title: "Number of factories, national (ASI)",
+      xLabel: "Year", yLabel: "Factories",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24"],
+      values: [41922,43143,43432,43753,44051,44854,45238,45132,46111,47238]
+    },
+    hhiChart: {
+      title: "HHI concentration, full firm universe reporting revenue each year",
+      xLabel: "Year", yLabel: "HHI",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [146.2,119.5,110.0,89.8,88.9,85.3,91.1,89.2,88.2,86.5,96.0],
+      band: "Competitive band is HHI < 1,500 — Food and Agro is extremely competitive on this basis, an order of magnitude below the threshold throughout. This HHI is computed directly from every firm reporting positive Revenue From Operations in the sector's Prowess export each year (1,368 to 1,689 firms depending on the year, not a fixed top-20 panel), so it reads much lower than a top-20-sample HHI would and is not comparable to that narrower methodology. Top-3 firm share on this same full-universe basis fell from 17.7% (2014-15) to a low of 11.3% (2023-24) before ticking up to 12.1% in 2024-25; the number of firms reporting usable revenue in a given year also fell steadily, from 1,680 (2014-15) to 1,368 (2024-25), consistent with the churn pattern below rather than a data artefact."
+    },
+    capIntensityChart: {
+      title: "Capital intensity — GFA ÷ Sales (national aggregate)",
+      xLabel: "Year", yLabel: "GFA / Sales (×)",
+      labels: ["14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25"],
+      values: [0.322,0.318,0.317,0.334,0.314,0.352,0.533,0.304,0.302,0.329,0.310],
+      band: "Moderate band is 0.5×–1.5× — Food and Agro sits below the moderate band for almost the entire decade (asset-light, branded-goods economics), with a single spike to 0.533× in 2020-21 as COVID suppressed the sales denominator faster than fixed assets could be shed, before returning to the 0.30×–0.33× range."
+    },
+    costStructureChart: {
+      title: "Cost structure, aggregate all-companies, 2024-25",
+      xLabel: "Component", yLabel: "% of sales",
+      labels: ["Raw material","Employee","Power & fuel","Other / margin"],
+      values: [56.94,4.29,1.47,37.30],
+      caption: "Raw material cost (56.94% of sales) is the dominant line, as expected for an agro-input-heavy sector. Power & fuel (1.47%) and royalties & technical fees (0.40%, not separately charted) are both modest. The 37.30% residual 'Other / margin' band includes overheads, financing costs, and PAT margin (5.92% of total income in 2024-25)."
+    },
+    firmTable: {
+      note: "Leading firms by 2024-25 revenue (single-year basis, superseding the previous 3-year-average presentation). Source: Prowess IQ, 2026 pull, food_agro_top10_indicators. Subsector labels are the Institute's own classification of each firm's principal business, not a Prowess-sourced field, and are flagged as such. Export Intensity and R&D % of Sales are reported only where Prowess carries a non-blank value for that firm; a dash indicates the underlying field was blank at source, not zero.",
+      cols: ["Firm","Subsector (Institute classification)","Revenue 2024-25 (₹ cr)","PAT margin %","R&D % of sales","Export intensity %"],
+      rows: [
+        ["ITC Ltd.","Diversified FMCG (foods, agri, cigarettes)⁽ʰ⁾","74,236","47.4%","0.25%","—"],
+        ["AWL Agri Business Ltd.","Edible oils & agri-commodities","61,677","2.0%","—","—"],
+        ["Patanjali Foods Ltd.","Edible oils & packaged foods","34,157","3.8%","—","—"],
+        ["Pernod Ricard India Pvt. Ltd.","Alcoholic beverages (spirits)","27,446","6.4%","—","—"],
+        ["United Spirits Ltd.","Alcoholic beverages (spirits)","26,780","5.8%","—","—"]
+      ]
+    },
+    firmConcNote: "Concentration is low and has fallen further. Computed from the full firm universe reporting revenue each year (see chart above), sector HHI stood at 96.0 in 2024-25, down from 146.2 in 2014-15, comfortably inside the 'Competitive' band by a wide margin. The top-3 firms' combined share on this same full-universe basis was 12.1% in 2024-25 — a materially different figure from a top-20-panel measure, because the denominator here is the sector's entire reporting population (1,368 firms in 2024-25), not a fixed shortlist. ⁽ʰ⁾ITC's reported PAT margin (47.4%) reflects group-wide, Total-Income-basis profitability across its full diversified business (cigarettes, hotels, paperboard, agri, and FMCG foods), not a food-segment-only figure — a scope caveat worth bearing in mind when reading it alongside single-business food and beverage firms in this table. R&D and export-intensity fields are blank at source for most of the top 5 by revenue; the firms that actually lead the sector on R&D and export value and intensity are shown separately below.",
+    rndByValueTable: {
+      note: "Top 5 firms by absolute R&D spend, 2024-25. Source: Prowess IQ, 2026 pull, food_agro_rnd_by_value.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)"],
+      rows: [
+        ["ITC Ltd.","187.68"],
+        ["Venco Research & Breeding Farm Pvt. Ltd.","102.87"],
+        ["Mahyco Pvt. Ltd.","75.50"],
+        ["Kaveri Seed Co. Ltd.","60.41"],
+        ["V N R Seeds Pvt. Ltd.","49.38"]
+      ]
+    },
+    rndByValueNote: "By absolute spend, ITC leads comfortably (₹188 crore), consistent with its scale, but at only 0.25% of its own sales — a low-intensity outlier at the top of an otherwise seed-and-agri-research-dominated list. Venco Research & Breeding Farm and Kaveri Seed Co. both appear here for the first time relative to the intensity-leaders list below, indicating they spend more in absolute terms than some intensity leaders while still not topping the intensity ranking themselves.",
+    rndLeadersTable: {
+      note: "Top 5 firms by R&D spend as a share of sales, 2024-25. These are not the sector's largest firms by revenue or by absolute R&D spend; nearly all are small, specialised seed and agri-research companies. Source: Prowess IQ, 2026 pull, food_agro_rnd_leaders.",
+      cols: ["Firm","R&D spend 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","R&D % of sales"],
+      rows: [
+        ["Venkateshwara Research & Breeding Farm Pvt. Ltd.","36.71","75.09","48.9%"],
+        ["Walko Food Co. Pvt. Ltd.","32.48","280.68","11.6%"],
+        ["Mahyco Pvt. Ltd.","75.50","849.90","8.9%"],
+        ["V N R Seeds Pvt. Ltd.","49.38","584.90","8.4%"],
+        ["East West Seeds India Pvt. Ltd.","29.58","394.16","7.5%"]
+      ]
+    },
+    rndLeadersNote: "R&D intensity in Food and Agro is concentrated in seed breeding and agricultural research firms (Venkateshwara, Mahyco, V N R Seeds, East West Seeds), not in the large branded-goods manufacturers that dominate the sector by revenue. All five R&D intensity leaders above report R&D spend of 7.5% or more of sales, comfortably in the Institute's 'Leader' band (>3%), a sharp contrast with the sector's largest firm by revenue, ITC, at 0.25%.",
+    exportByValueTable: {
+      note: "Top 5 firms by absolute export value, 2024-25. Source: Prowess IQ, 2026 pull, food_agro_export_by_value.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)"],
+      rows: [
+        ["Allanasons Pvt. Ltd.","9,505.58"],
+        ["Fair Exports (India) Pvt. Ltd.","6,608.12"],
+        ["D D International Pvt. Ltd.","2,041.62"],
+        ["Shri Dutt India Pvt. Ltd.","1,755.82"],
+        ["L T Foods Ltd.","1,637.12"]
+      ]
+    },
+    exportByValueNote: "Allanasons Pvt. Ltd. leads by a wide margin in absolute export value (₹9,506 crore) and also tops the export-intensity ranking below at 93.9% — a firm that is both the largest exporter and among the most export-dependent, not just the largest in a diversified business. L T Foods Ltd. (basmati rice) is the only listed company among the top-5-by-value exporters; the other four are unlisted private exporters.",
+    exportLeadersTable: {
+      note: "Top 5 firms by export intensity (exports as % of sales), 2024-25. As with R&D, these are largely not the sector's largest firms by revenue or by absolute export value. Source: Prowess IQ, 2026 pull, food_agro_export_leaders.",
+      cols: ["Firm","Exports 2024-25 (₹ cr)","Revenue 2024-25 (₹ cr)","Export intensity %"],
+      rows: [
+        ["Nutrivita Foods Pvt. Ltd.","42.72","43.05","99.2%"],
+        ["Compact India Pvt. Ltd.","66.88","68.79","97.2%"],
+        ["Innovative Cuisine Pvt. Ltd.","282.75","292.90","96.5%"],
+        ["Pharmanza Herbal Pvt. Ltd.","149.97","158.16","94.8%"],
+        ["Allanasons Pvt. Ltd.","9,505.58","10,121.87","93.9%"]
+      ]
+    },
+    exportLeadersNote: "Allanasons Ltd., a meat and animal-protein exporter, is the only firm to appear on both the by-value and by-intensity export leader lists — by far the largest of the five in absolute terms (₹9,506 crore) and still exports 93.9% of what it sells, an export-led business model rather than a domestic one with an export sideline. The other four intensity leaders are smaller, near-fully export-oriented specialty food processors that don't rank among the top absolute exporters.",
+    churnNote: "Firm-level churn, FY2014-15 reporting universe to present (Prowess IQ, 2026 pull, churn_summary_all_sectors): of 1,872 firms reporting in the sector in 2014-15, 452 have stopped reporting entirely and a further 96 are dormant (reporting but with negligible or zero activity), leaving 1,324 still active. Combined churn (stopped-reporting plus dormant) is 548 firms, or 29.3% of the original 2014-15 universe — among the higher churn rates the Institute has recorded across the eleven sectors in this series, consistent with a sector containing a very large number of small, undercapitalised food-processing units alongside a small number of large branded players. This 1,872-firm baseline (companies with any FY2014-15 revenue on record) is a broader test than the HHI series above (which counts only firms with positive revenue in each specific year), which is why the two firm counts for FY2014-15 differ slightly (1,872 vs 1,680)."
+  },
+
+  performance: {
+    eyebrow: "02 — Performance",
+    title: "A steady, low-volatility performer that trails the pack on growth",
+    subhead: "Food and Agro is the least volatile large sector in this series by a wide margin, but that stability comes with a below-average growth rate: the sector ranks in the bottom half on both IIP level and CAGR, even as firm-level financials have improved steadily.",
+    iipChart: {
+      title: "IIP index, Food and Agro, 2012-13 to 2025-26 (base 2011-12 = 100)",
+      xLabel: "Year", yLabel: "Index",
+      labels: ["12-13","13-14","14-15","15-16","16-17","17-18","18-19","19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      values: [104.3,105.9,112.8,109.0,101.9,106.3,116.5,118.0,110.1,117.5,123.6,125.1,123.4,124.4],
+      annotations: [
+        {index:8, label:"110.1 (COVID)", color:"var(--thread-madder)"},
+        {index:11, label:"peak 125.1", color:"var(--thread-turmeric)"},
+        {index:13, label:"124.4 (latest)", color:"var(--thread-indigo)"}
+      ]
+    },
+    marginChart: {
+      title: "PAT margin & ROE, national aggregate financials",
+      xLabel: "Year", yLabel: "%",
+      labels: ["14-15","19-20","22-23","24-25"],
+      series: [
+        {name:"PAT margin %", color:"var(--thread-madder)", values:[1.19,4.55,4.58,5.92]},
+        {name:"ROE %", color:"var(--thread-teal)", values:[5.28,10.44,15.43,15.04]}
+      ]
+    },
+    asiTable: {
+      note: "ASI national totals, Food and Agro — three snapshot years",
+      cols: ["Indicator","2014-15","2021-22","2022-23"],
+      rows: [
+        ["Workers per factory","42.8","44.4","47.7"],
+        ["Wages per worker (₹)","88,460","1,39,708","1,49,114"],
+        ["Output per worker (₹)","54,39,801","83,72,705","90,25,792"],
+        ["Productivity–wage ratio","5.64","5.54","5.48"]
+      ]
+    },
+    returnsTable: {
+      note: "Returns, leverage and liquidity, aggregate all-companies basis. Source: CMIE Industry Outlook.",
+      cols: ["Indicator","2014-15","2024-25"],
+      rows: [
+        ["PAT margin %","1.2%","5.9%"],
+        ["ROE %","5.3%","15.0%"],
+        ["ROCE %","12.0%","18.3%"],
+        ["Debt-to-Equity (×)","1.07","0.53"],
+        ["Interest Cover (×)","2.17","5.70"],
+        ["Current Ratio","1.05","1.35"],
+        ["Free Cash Flow (₹ mn)","1,36,424","98,871"]
+      ]
+    },
+    fcfNote: "Free Cash Flow has trended down over the decade even as profitability improved: ₹1,36,424 million in 2014-15 to ₹98,871 million in 2024-25, with a peak of ₹5,94,206 million in 2021-22, a year of unusually low Purchase of Fixed Assets. The 2024-25 figure coincides with capital expenditure (Purchase of Fixed Assets) of ₹4,86,287 million, the highest of the decade.",
+    rndFlag: "R&D spend has held at roughly 0.08%–0.10% of sales for the entire decade (0.083% in 2024-25) — a clear 'laggard' by the Institute's own thresholds (Leader >3%, Active 1–3%, Laggard <1%), among the lowest R&D intensities of any sector reviewed in this series, consistent with a sector whose competitive edge runs through branding, distribution and formulation tweaks rather than process innovation.",
+    narrative: "Food and Agro's IIP index has grown steadily but unremarkably: from 104.3 (2012-13) to 124.4 (2025-26), a full-period CAGR of just 1.37%, ranking 8th of 11 sectors on both level and CAGR. The sector's defining characteristic on this measure is stability rather than either strength or weakness: it is the 2nd-least-volatile sector in the series (volatility rank 10 of 11, where rank 1 is most volatile), with a standard deviation of year-on-year growth roughly half that of Textiles or Electronics. The COVID-year shock was comparatively mild (-6.7% in 2020-21, against double-digit falls in several other sectors) and recovery was swift, reaching a fresh peak of 125.1 in 2023-24 before easing slightly to 124.4 in 2025-26 (latest-year growth of just 0.80%, ranking 7th of 11). Firm-level financials tell a more encouraging story: PAT margin nearly quintupled from 1.19% (2014-15) to 5.92% (2024-25), and ROE nearly tripled from 5.28% to 15.04%, alongside a halving of Debt-to-Equity. The picture overall is a sector that is financially healthier than it was a decade ago, but whose physical output growth has been the steadiest, not the fastest, of the eleven sectors in this series."
+  },
+
+  investment: {
+    eyebrow: "03 — Investment & PLI",
+    title: "A large, private-sector-led pipeline, with a food-processing PLI scheme layered on top",
+    subhead: "Investment in Food and Agro is overwhelmingly private and has grown steadily. The Production Linked Incentive Scheme for Food Processing Industries (PLISFPI) applies to specific product categories within the sector, not the sector as a whole, and its actual disbursement has run well behind the scheme's own annual budget.",
+    pipelineChart:{
+      title:"National investment pipeline — cost (₹ crore)",
+      xLabel:"Year", yLabel:"₹ crore",
+      labels:["19-20","22-23","24-25"],
+      series:[
+        {name:"New investments announced", color:"var(--thread-teal)", values:[8665,17621,44734]},
+        {name:"Investments dropped", color:"var(--thread-madder)", values:[15229,7447,13628]}
+      ]
+    },
+    pipelineTable:{
+      note:"Detailed pipeline breakdown, 2024-25. Source: CMIE CapEx database.",
+      cols: ["Indicator","Value"],
+      rows: [
+        ["Total investment outstanding","₹13,47,822 cr (557 projects)"],
+        ["Under implementation","₹5,45,369 cr (249 projects)"],
+        ["Implementation stalled","₹63,604 cr (27 projects)"],
+        ["Investments completed","₹74,833 cr (down from ₹1,09,156 cr in 2023-24)"],
+        ["New investments announced","₹4,47,343 cr (up from ₹3,31,285 cr in 2023-24)"]
+      ]
+    },
+    dropFlag:"Dropped-investment cost rose from ₹51,137 crore (2023-24) to ₹1,36,277 crore (2024-25) — a near-tripling in a single year — while investments-completed value fell from ₹1,09,156 crore to ₹74,833 crore over the same window. Both figures are worth tracking alongside the sector's otherwise-growing new-investment trend.",
+    stateTable:{
+      note:"Top-3-GVO-state investment pipeline, outstanding cost (₹ crore). States ranked by the sector's actual GVO order (Maharashtra, Uttar Pradesh, Gujarat), consistent with the Geography theme below.",
+      cols:["State","2019-20","2022-23","2024-25"],
+      rows:[
+        ["Maharashtra","13,430","13,613","20,576"],
+        ["Uttar Pradesh","7,135","12,321","17,258"],
+        ["Gujarat","6,225","5,172","12,770"]
+      ]
+    },
+    ownershipChart:{
+      title:"New investment by ownership group (₹ crore)",
+      xLabel:"Ownership group", yLabel:"₹ crore, 2024-25",
+      labels:["Central Govt","State Govt","Indian Private","Foreign Private"],
+      values:[235,1119,36117,7263]
+    },
+    ownershipNote:"Indian Private Sector dominates new investment overwhelmingly (₹36,117 crore of the ₹44,734 crore total in 2024-25, roughly 81%); combined government share (Central + State) is about 3%, and Foreign Private is around 16% — a meaningfully larger foreign-private share than in most other sectors reviewed in this series so far.",
+    pliNote:"The Production Linked Incentive Scheme for Food Processing Industries (PLISFPI) was launched in 2021 and applies to specific product categories (ready-to-eat/ready-to-cook foods, marine products, processed fruits and vegetables, mozzarella cheese, and select organic and innovative products), not to the Food and Agro sector as a whole. CMIE's Revised Estimate actual disbursement rose from ₹10 crore in 2021-22 (the scheme's first year) to ₹801 crore (2022-23) and ₹1,150 crore (2023-24), before falling to ₹700 crore in 2024-25 — a year in which actual disbursement came in well below the Budget Estimate for that year (₹1,444 crore), a roughly 52% underspend against budget. Budget Estimates for 2025-26 and 2026-27 both hold flat at ₹1,200 crore. The scheme's total approved multi-year outlay (the policy-design figure, as distinct from these annual disbursement figures) is ₹10,900 crore, sanctioned by the Union Cabinet on 31 March 2021 for implementation across 2021-22 to 2026-27 (Ministry of Food Processing Industries; PIB).",
+    fdiNote:"A dedicated FDI figure for the combined Food and Agro sector (NIC 10, 11, 12) was not available in the sources reviewed for this paper and is flagged rather than estimated; DPIIT publishes FDI by narrower sub-categories that do not sum cleanly to this project's NIC-based sector definition without further reconciliation, the same caveat noted for Chemicals in this series.",
+    rndHighlight: { pct: "0.083%", label: "R&D spend as share of sales, 2024-25 — flat for a decade", band: "Laggard (<1%)", note: "R&D intensity in Food and Agro is among the lowest of any sector in this series, roughly a tenth of Chemicals' 0.55% and well below Textiles' 0.10%. Even the PLISFPI scheme's actual 2024-25 disbursement (₹700 crore) is a small fraction of the sector's total R&D spend base, consistent with a sector whose largest firms compete on brand, distribution, and formulation rather than process or product R&D in the conventional sense." },
+    insightBox:"Food and Agro's investment story is a large and growing private-capital pipeline running mostly independent of any sector-wide policy incentive: the PLISFPI scheme that touches this sector is real but narrowly scoped to specific product categories, and its actual annual disbursement has consistently run behind its own Budget Estimate. On the numbers available, this remains overwhelmingly a private-sector and foreign-private investment story rather than a policy-incentive-driven one."
+  },
+
+  trade: {
+    eyebrow: "04 — Trade",
+    title: "A trade surplus built on rice and shrimp, importing the oils it doesn't grow",
+    subhead: "Food and Agro runs a solid trade surplus, driven overwhelmingly by rice and marine exports, while import dependency is concentrated in a single category: edible oils the country does not produce enough of domestically.",
+    tradeChart: {
+      title: "Exports vs imports, national (₹ crore)",
+      xLabel: "Year", yLabel: "₹ crore",
+      labels: ["19-20","20-21","21-22","22-23","23-24","24-25","25-26"],
+      series: [
+        {name:"Exports", color:"var(--thread-teal)", values:[233864,288693,346614,414875,391404,429115,463508]},
+        {name:"Imports", color:"var(--thread-madder)", values:[138813,155409,232317,267984,262080,309034,334865]}
+      ]
+    },
+    stats:[
+      {n:"9.6%", l:"export growth, FY24-25"},
+      {n:"17.9%", l:"import growth, FY24-25 — faster"},
+      {n:"41.9%", l:"import dependency"},
+      {n:"12.9%", l:"export 5-year CAGR"},
+      {n:"17.4%", l:"import 5-year CAGR"}
+    ],
+    caveatNote: "Figures in this section are directional rather than exact — the underlying HS-to-NIC concordance maps a majority but not all of trade value to a sector; the remainder is unclassified and excluded rather than estimated. A large share of both export and import value in this sector is concentrated in a handful of bulk commodities (rice, shrimp, edible oils), so global crop yields and commodity-price cycles, not just domestic manufacturing competitiveness, drive much of the year-to-year swing.",
+    partnersTable:{
+      note: "Top-5 partners by value, FY24-25",
+      cols:["#","Export partner (₹ cr)","Import partner (₹ cr)"],
+      rows:[
+        [1,"USA — 46,363","Russia — 23,287"],
+        [2,"UAE — 29,361","USA — 17,180"],
+        [3,"China — 26,032","UAE — 4,737"],
+        [4,"Saudi Arabia — 19,805","China — 3,487"],
+        [5,"Bangladesh — 16,549","Switzerland — 2,897"]
+      ]
+    },
+    productsTable:{
+      note: "Top-5 traded products by value, FY24-25. HS-code level.",
+      cols:["#","Export product (₹ cr)","Import product (₹ cr)"],
+      rows:[
+        [1,"Semi/wholly milled rice — 1,00,721","Crude palm oil & fractions — 53,961"],
+        [2,"Other shrimps & prawns, frozen — 38,096","Soya bean crude oil — 39,451"],
+        [3,"Boneless (meat) — 31,072","Crude sunflower/safflower oil — 30,988"],
+        [4,"Refined sugar, no flavour/colour — 13,700","Refined palm oil & fractions — 16,237"],
+        [5,"Tobacco, partly/wholly stemmed — 11,630","Cashew nuts, fresh/dried in shell — 13,742"]
+      ]
+    }
+  },
+
+  geography: {
+    eyebrow: "05 — Geography",
+    title: "Maharashtra's scale, Uttar Pradesh close behind",
+    subhead: "Maharashtra leads on absolute output, but Uttar Pradesh, Gujarat, Karnataka and Tamil Nadu together make Food and Agro one of the more geographically spread sectors in this series — no single state dominates the way Gujarat does in Chemicals or Tamil Nadu does in Textiles.",
+    gvoAbsChart:{
+      title:"Absolute GVO by leading state, 2023-24 (₹ crore)",
+      xLabel:"State", yLabel:"₹ crore",
+      labels:["Maharashtra","Uttar Pradesh","Gujarat","Karnataka","Tamil Nadu"],
+      values:[296292,278350,258244,167595,138386]
+    },
+    gvoChart:{
+      title:"State share of national GVO, top 5",
+      xLabel:"State", yLabel:"% of national GVO",
+      labels:["Maharashtra","Uttar Pradesh","Gujarat","Karnataka","Tamil Nadu"],
+      values:[13.22,12.42,11.52,7.48,6.18]
+    },
+    wageChart:{
+      title:"Wages per worker, top 5 states (₹)",
+      xLabel:"State", yLabel:"₹ per worker",
+      labels:["Maharashtra","Uttar Pradesh","Gujarat","Karnataka","Tamil Nadu"],
+      values:[210564,178009,192167,228987,137183]
+    },
+    stateTable:{
+      note:"Top-5 states, latest available ASI year (2023-24)",
+      cols:["State","Factories","GVO share","Employment share","Wages/worker"],
+      rows:[
+        ["Maharashtra","2,962","13.2%","12.4%","₹2,10,564"],
+        ["Uttar Pradesh","3,377","12.4%","9.6%","₹1,78,009"],
+        ["Gujarat","2,828","11.5%","5.9%","₹1,92,167"],
+        ["Karnataka","2,520","7.5%*","5.9%*","₹2,28,987"],
+        ["Tamil Nadu","5,708","6.2%","9.7%","₹1,37,183"]
+      ]
+    },
+    flag:"Top-5 states account for ~51% of national GVO — the least concentrated geography of any sector reviewed in this series so far, consistent with a sector (food processing) that follows agricultural raw-material availability across many states rather than clustering around a small number of industrial hubs. Karnataka stands out for pairing the highest wages per worker among the top-5 (₹2,28,987) with a mid-table factory count, while Tamil Nadu has the most factories (5,708) but the lowest wages per worker, consistent with a larger number of smaller-scale processing units. *Karnataka's GVO and employment shares were not pre-filled in the source workbook (unlike the other four states) and are computed here directly as state ÷ national totals, following the sheet's own stated methodology, rather than left blank.",
+    jharkhandTitle:null,
+    jharkhandText:null
+  },
+
+  clusters: {
+    eyebrow: "06 — Clusters & Supply Chain",
+    title: "Five registered clusters, all in one state",
+    subhead: "The cluster register for Food and Agro is the thinnest and most geographically lopsided of any sector reviewed in this series: every registered cluster sits in Gujarat, despite the sector's output being one of the most evenly spread across states of any theme covered above. This asymmetry is flagged here as a priority for follow-up research, not as a finding that clusters elsewhere don't exist.",
+    clusterChips:[
+      "Veraval Seafood Processing, Gujarat — 60 active units",
+      "Bhavnagar (Mahuva) Onion Dehydration, Gujarat — ~71–120 units",
+      "Unjha Spice & Isabgol Market, Gujarat — ~800 registered firms",
+      "Navsari Mango & Rice Processing, Gujarat — data thin",
+      "Anand Dairy & Milk Processing (GCMMF/Amul), Gujarat"
+    ],
+    clusterTable:{
+      note:"Registered Food and Agro clusters, selected indicators. Source: Cluster Supply Chain Linkage Workbook.",
+      cols:["Cluster","State","Units (est.)","Turnover (est.)","Principal products","Export orientation"],
+      rows:[
+        ["Veraval Seafood Processing","Gujarat","60 active units","₹3,350 cr/year (cluster-wide estimate)","IQF frozen seafood, shrimp, cuttlefish, ready-to-cook products","Y (EU, South Asia, China, Japan, Gulf, USA)"],
+        ["Bhavnagar (Mahuva) Onion Dehydration","Gujarat","~71–120 units ⁽ᵉ⁾","No data found","Dehydrated onion & garlic (kibbled/minced/chopped/granules)","Y (historically ~75-80% export)"],
+        ["Unjha Spice & Isabgol Market","Gujarat","~800 registered firms","No data found","Cumin, fennel, coriander, isabgol (psyllium husk), other spices","Y (domestic + export)"],
+        ["Anand Dairy & Milk Processing (GCMMF/Amul)","Gujarat","18,600 village cooperatives, 18 district unions","₹65,911 cr (GCMMF/Amul, FY2024-25)","Liquid milk, ghee, butter, paneer, milk powder, cheese","Partial (USA, Gulf, Singapore, China, Japan)"]
+      ]
+    },
+    note:"Every registered cluster in the underlying workbook for this sector sits in Gujarat, even though Gujarat is only the 3rd-largest state by GVO share (11.5%) behind Maharashtra and Uttar Pradesh. This is the sharpest cluster-geography mismatch of any sector reviewed in this series. It is flagged here as a priority area to extend research into Maharashtra, Uttar Pradesh, Karnataka and Tamil Nadu, rather than read as a finding that these states lack food-processing clusters of their own.",
+    noteD:"Cluster data vintage varies by source and is uneven in completeness: the Veraval and Anand profiles carry recent, well-sourced figures (2021 and FY2024-25 respectively), while the Bhavnagar and Unjha profiles rely on conflicting unit counts across sources or report 'No data found' for turnover. The Navsari entry rests on a single MoFPI subsidy-project record rather than a cluster-wide census.",
+    noteE:"Firm-to-firm supply-chain linkage evidence for this sector's clusters was not assessed in the same depth as the register entries above and is a further, separate data gap beyond the geographic coverage gap already noted."
+  }
+};
+
+/* =====================================================================
+   THE SECTOR STORY
+   ===================================================================== */
+const STORY_DATA = {
+  eyebrow: "07 — The Sector Story",
+  title: "Big, steady, and still leaving value on the table",
+  lede: "The narrative synthesis, pulling together every theme above into one read on where Food and Agro stands today.",
+  sections: [
+    { h: "The core tension: the largest factory base, a below-average growth rate", p: [
+      "Food and Agro has the highest factory count of any sector in this series (47,238 in 2023-24, up from 41,922 in 2014-15) and Gross Value of Output that has more than doubled over the decade, from ₹9.75 lakh crore to ₹22.41 lakh crore, a 129.9% increase. Firm-level financial performance has genuinely improved alongside that scale: PAT margin rose from 1.19% (2014-15) to 5.92% (2024-25), and ROE nearly tripled, from 5.28% to 15.04%.",
+      "But by the IIP, the sector ranks only 8th of 11 on both level and full-period CAGR (1.37%), a below-average growth rate for a sector of its scale. What distinguishes Food and Agro is stability rather than either strength or weakness: it is the 2nd-least-volatile sector in this series, weathering the COVID year with one of the mildest shocks recorded (-6.7% in 2020-21) and recovering quickly. The value-added share of GVO has drifted down slightly over the decade (11.0% to 10.7%), the same pattern of scale outrunning value capture documented in several other sectors in this series, though less pronounced here than in, for instance, Electronics."
+    ]},
+    { h: "Trade: a real surplus, built on a narrow commodity base", p: [
+      "Food and Agro runs a healthy trade surplus (₹1.20 lakh crore in FY24-25) with exports growing at 9.6% year-on-year, but imports are growing faster still (17.9% YoY, and a 17.4% five-year CAGR against exports' 12.9%) — import dependency stands at 41.9%. The trade pattern is narrowly concentrated: rice alone (semi/wholly milled, HS 100630) accounts for roughly a quarter of total export value at ₹1,00,721 crore, with frozen shrimp and boneless meat rounding out the top exports. On the import side, the entire top-5 list is edible oils and one nut (crude palm, soya bean, sunflower/safflower, refined palm oil, and cashew nuts) — a structural gap between India's oilseed production and its edible-oil consumption that shows up clearly in the trade data. The USA is the leading export partner (₹46,363 crore) while Russia leads on imports (₹23,287 crore), reflecting India's large-scale sunflower-oil imports from the Black Sea region."
+    ]},
+    { h: "Investment: a growing private pipeline, a PLI scheme running behind its own budget", p: [
+      "New investment in Food and Agro reached ₹44,734 crore in 2024-25, up sharply from ₹33,129 crore the prior year, and remains overwhelmingly private (Indian Private Sector at ₹36,117 crore, roughly 81% of the total), with a meaningfully larger Foreign Private share (~16%) than most other sectors in this series. The concerning signal: dropped-investment cost nearly tripled in the latest year (₹51,137 crore to ₹1,36,277 crore), while completed-investment value fell. On policy, the Production Linked Incentive Scheme for Food Processing Industries (PLISFPI) touches specific product categories within this sector — ready-to-eat foods, marine products, processed fruits and vegetables, mozzarella, and select organic/innovative products. Its actual Revised Estimate disbursement rose from ₹10 crore (2021-22) to ₹1,150 crore (2023-24) before falling to ₹700 crore in 2024-25, roughly 52% below that year's Budget Estimate of ₹1,444 crore. The scheme's total approved multi-year outlay is ₹10,900 crore, sanctioned for 2021-22 to 2026-27."
+    ]},
+    { h: "Geography: the most evenly spread sector in this series", p: [
+      "Maharashtra leads by a narrow margin (13.2% of national GVO, ₹2,96,292 crore) ahead of Uttar Pradesh (12.4%, ₹2,78,350 crore) and Gujarat (11.5%, ₹2,58,244 crore), with Karnataka and Tamil Nadu rounding out the top five. The top-5 states together account for only around 51% of national output, the least concentrated geography of any sector reviewed in this series so far, a pattern consistent with food processing following agricultural raw-material availability across many states rather than clustering around a small number of industrial hubs. Karnataka pairs the highest wages per worker among the top-5 (₹2,28,987) with a mid-table factory count, while Tamil Nadu has by far the most factories (5,708) but the lowest wages per worker, suggesting a larger number of smaller-scale operations."
+    ]},
+    { h: "Clusters: a real data gap, not a real geography", p: [
+      "Every cluster formally registered for this sector in the underlying workbook sits in Gujarat, spanning seafood processing (Veraval), onion dehydration (Bhavnagar/Mahuva), spice and psyllium trading (Unjha), and the country's best-known dairy cooperative federation (Anand/GCMMF-Amul, with FY2024-25 turnover of ₹65,911 crore). But Gujarat is only the sector's 3rd-largest state by GVO share, behind Maharashtra and Uttar Pradesh, neither of which has a single cluster logged. This is the sharpest cluster-geography mismatch of any sector in this series and is flagged as a priority to extend research into Maharashtra, Uttar Pradesh, Karnataka and Tamil Nadu, rather than read as a finding that food-processing clusters elsewhere don't exist — Nashik's grape and onion processing, Punjab's food-grain milling belt, and Andhra Pradesh's aquaculture-processing hubs are all well documented elsewhere but not yet captured in this project's workbook."
+    ]},
+    { h: "R&D: the lowest intensity of any sector reviewed", p: [
+      "R&D spend as a share of sales has held at roughly 0.08%–0.10% for the entire decade (0.083% in 2024-25), among the lowest of any sector covered in this series, below even Textiles' 0.10%. This is consistent with a sector whose largest firms, ITC, AWL Agri Business, Patanjali Foods, Pernod Ricard, and the beverage majors, compete primarily on brand, distribution and formulation rather than sustained process or product R&D, and should be read as a structural feature of branded-FMCG competition rather than a policy failure."
+    ]}
+  ],
+  summary: [
+    {n:"+129.9%", l:"GVO growth, 2014-15 → 2023-24"},
+    {n:"11.0%→10.7%", l:"GVA share of GVO, 2014-15 → 2023-24"},
+    {n:"0.083%", l:"R&D spend, share of sales (2024-25)"},
+    {n:"₹700 cr", l:"PLISFPI actual disbursement (RE), 2024-25"},
+    {n:"146.2→96.0", l:"HHI, 2014-15 → 2024-25 (full firm universe)"}
+  ],
+  takeaway: "Food and Agro is India's largest manufacturing sector by factory count and one of its steadiest by output growth, but 'steady' is the operative word rather than 'fast': it ranks in the bottom half of this series on both IIP level and CAGR, even as firm-level margins and returns have improved substantially. Its trade position is genuinely healthy but rests on a narrow commodity base (rice and shrimp exports, edible-oil imports) exposed to global crop and price cycles more than domestic manufacturing competitiveness. And its two thinnest spots, R&D intensity and the cluster register, both point the same direction: this is a sector that competes on scale, distribution and brand rather than process innovation, and whose supporting data infrastructure (cluster mapping in particular) has real, documented gaps still to be closed.",
+  references: [
+    "Annual Survey of Industries, Ministry of Statistics and Programme Implementation, National and State Summary Tables, 2014-15 to 2023-24.",
+    "Index of Industrial Production, corrected 11-sector composite, Ministry of Statistics and Programme Implementation.",
+    "Directorate General of Commercial Intelligence and Statistics, TradeStat / Trade Intelligence and Analytics Portal, FY19-20 to FY25-26.",
+    "Centre for Monitoring Indian Economy, Prowess IQ database, firm-level panel by sector.",
+    "Centre for Monitoring Indian Economy, Industry Outlook, cost and capital-structure aggregates, FY14-15 to FY24-25, CapEx Investment Pipeline database, and PLI Budget/Revised Estimates.",
+    "Cluster Supply Chain Linkage Workbook, compiled from Sameeeksha/TERI, academic cluster studies, Ministry of Food Processing Industries project records, GCMMF/Amul official disclosures, and CARE Ratings.",
+    "Ministry of Food Processing Industries, Production Linked Incentive Scheme for Food Processing Industries (PLISFPI), scheme guidelines and total outlay (₹10,900 crore, 2021-22 to 2026-27), per PIB Cabinet approval release."
+  ],
+  notes: [
+    {tag:"(a)", text:"IIP item-group weights reconcile to a small documented residual against the official total; this does not affect sectors' relative ranking."},
+    {tag:"(b)", text:"The HS-to-NIC concordance underlying the trade figures maps a majority but not all of trade value to a sector; the unclassified remainder is excluded rather than estimated. A large share of this sector's trade value sits in a small number of bulk commodities (rice, shrimp, edible oils), so global crop yields and commodity prices are a major driver of year-to-year swings independent of domestic manufacturing trends."},
+    {tag:"(c)", text:"Output per worker and value-added per worker are derived by dividing ASI national aggregates by total ASI-reported workers; they are sector-wide averages, not a firm-level or per-worker survey measure."},
+    {tag:"(d)", text:"Karnataka's State Share of India GVO % and State Share of India Employment % were not pre-filled in the source workbook (unlike the other top-5 states) and are computed here directly as state ÷ national totals, following the sheet's own stated methodology."},
+    {tag:"(e)", text:"Every cluster registered for this sector in the underlying workbook sits in Gujarat; this is flagged as a priority to extend research into Maharashtra, Uttar Pradesh, Karnataka and Punjab, not as a finding about the sector's true cluster geography."},
+    {tag:"(f)", text:"PLISFPI (Production Linked Incentive Scheme for Food Processing Industries) actual Revised Estimate and Budget Estimate disbursement figures are sourced from CMIE Industry Outlook (Budget Estimate and Revised Estimate lines for Processed Foods). The scheme's total approved multi-year outlay (₹10,900 crore, 2021-22 to 2026-27) is sourced separately from Ministry of Food Processing Industries / PIB scheme announcements, not from CMIE."},
+    {tag:"(g)", text:"Firm 5 and Firm 7 in the underlying firm-level workbook (Firm_level_data_2, Food & Agro-based Products sheet) are both labelled 'United Breweries', but carry materially different sales, profitability and capital-intensity figures across every year on record. This is not a simple duplicate: the scale of Firm 5's sales (₹19,440-26,640 crore across 2014-15 to 2024-25) is far larger than the real United Breweries Ltd's actual revenue (roughly ₹7,000-7,300 crore), and is more consistent in scale with a large diversified spirits producer. Firm 7's figures do not cleanly match either company either. This looks like a company-identity or labelling error at source rather than a straightforward duplicate entry, and the Firm 5 entry used in the Scale section's top-5 table should be re-verified against Prowess directly before being cited without qualification."}
+  ],
+  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · NIC Divisions 10, 11, 12 · Primary Research: To be asked · Compiled by: Riddhi Bhargava"
+};
+
+
+const NODE_W = 1500, NODE_H = 940;      // satellite content box size (canvas px)
+const CENTER_W = 1200, CENTER_H = 800;  // central node box size
+const RADIUS_X = 2350, RADIUS_Y = 1170; // elliptical ring
+
+const ORDER = ["scale","performance","trade","investment","geography","clusters"];
+const ANGLES = {
+  scale: -90, performance: -30, trade: 30, investment: 90, geography: 150, clusters: -150
+};
+const ACCENTS = {
+  scale: "var(--maroon)", performance: "var(--maroon)", trade: "var(--maroon)",
+  investment: "var(--maroon)", geography: "var(--maroon)", clusters: "var(--maroon)"
+};
+const NAV_ORDER = ["center", ...ORDER];
+
+let layout = {};
+
+/* =====================================================================
+   CHART HELPERS
+   ===================================================================== */
+function niceMax(v){ const p = Math.pow(10, Math.floor(Math.log10(v||1))); const n=v/p;
+  const step = n<=1?1:n<=2?2:n<=5?5:10; return step*p; }
+
+function svgAxes(x0,y0,x1,y1,maxVal,minVal,xLabel,yLabel,title,w,h){
+  let s = `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val = minVal + (maxVal-minVal)*i/ticks;
+    const y = y0 - (y0-y1)*i/ticks;
+    s += `<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s += `<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s += `<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s += `<text class="axis-label" x="${(x0+x1)/2}" y="${y0+50}" text-anchor="middle">${xLabel}</text>`;
+  s += `<text class="axis-label" transform="translate(${x0-62},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${yLabel}</text>`;
+  s += `<text class="chart-title" x="${x0}" y="${y1-22}">${title}</text>`;
+  return s;
+}
+function fmtShort(v){
+  if(Math.abs(v)>=100000) return (v/100000).toFixed(1)+"L";
+  if(Math.abs(v)>=1000) return (v/1000).toFixed(v>=10000?0:1)+"k";
+  return (Math.round(v*100)/100).toString();
+}
+
+function lineChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  const allVals = cfg.series ? cfg.series.flatMap(s=>s.values) : cfg.values;
+  let maxVal = Math.max(...allVals), minVal = Math.min(0,Math.min(...allVals));
+  maxVal = niceMax(maxVal*1.15);
+  if(minVal<0) minVal = -niceMax(-minVal*1.15);
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const yFor = v => y0 - (y0-y1)*((v-minVal)/(maxVal-minVal));
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,minVal,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  labels.forEach((l,i)=>{ s+=`<line class="axis-tick" x1="${x0+i*xStep}" y1="${y0}" x2="${x0+i*xStep}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x0+i*xStep}" y="${y0+24}" text-anchor="middle">${l}</text>`; });
+  const series = cfg.series || [{name:null,color:"var(--thread-indigo)",values:cfg.values}];
+  series.forEach(ser=>{
+    let path="";
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v); path+= (i===0?"M":"L")+x+","+y+" "; });
+    s+=`<path d="${path}" fill="none" stroke="${ser.color}" stroke-width="3"/>`;
+    ser.values.forEach((v,i)=>{ const x=x0+i*xStep, y=yFor(v);
+      s+=`<circle cx="${x}" cy="${y}" r="4.5" fill="${ser.color}"/>`; });
+  });
+  if(cfg.annotations){
+    cfg.annotations.forEach(a=>{
+      const x=x0+a.index*xStep, y=yFor(cfg.values[a.index]);
+      s+=`<circle cx="${x}" cy="${y}" r="6" fill="${a.color}" stroke="var(--card)" stroke-width="2"/>`;
+      s+=`<text class="anno-text ${a.color=== 'var(--thread-madder)' ? 'down' : a.color==='var(--thread-indigo)' ? 'latest' : ''}" x="${x+10}" y="${y-10}">${a.label}</text>`;
+    });
+  }
+  if(cfg.series){
+    let lx=x1-220, ly=y1+8;
+    cfg.series.forEach((ser,i)=>{
+      s+=`<rect x="${lx}" y="${ly+i*24-9}" width="14" height="14" fill="${ser.color}"/>`;
+      s+=`<text class="legend-label" x="${lx+20}" y="${ly+i*24+2}">${ser.name}</text>`;
+    });
+  }
+  s+="</svg></div>";
+  return s;
+}
+
+function barLineChart(cfg){
+  /* Dual-axis: bars on left Y (GVO), line on right Y (GVA%) so the
+     line occupies the full chart height instead of sitting near 0. */
+  const w=1160,h=560, x0=118,y1=70,y0=h-100,x1=w-100;
+  const barVals=cfg.barValues, lineVals=cfg.lineValues;
+  let maxBar = niceMax(Math.max(...barVals)*1.38);
+  const minLine = Math.min(...lineVals)*0.9;
+  const maxLine = Math.max(...lineVals)*1.15;
+  const labels = cfg.labels;
+  const xStep = (x1-x0)/(labels.length-1);
+  const bw = xStep*0.5;
+  const xPad = Math.max(26, bw*0.55);
+  const xAt = i => x0 + xPad + i*((x1-x0-2*xPad)/(labels.length-1));
+  const yBarFor = v => y0 - (y0-y1)*(v/maxBar);
+  const yLineFor = v => y0 - (y0-y1)*((v-minLine)/(maxLine-minLine));
+  const HALO = 'paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round;';
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  /* title */
+  s += `<text class="chart-title" x="${x0}" y="${y1-30}">${cfg.title}</text>`;
+  /* left axis (bars) */
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}"/>`;
+  s += `<line class="axis-line" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}"/>`;
+  const ticks=4;
+  for(let i=0;i<=ticks;i++){
+    const val=maxBar*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="grid-line" x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>`;
+    s+=`<line class="axis-tick" x1="${x0-7}" y1="${y}" x2="${x0}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x0-12}" y="${y+5}" text-anchor="end">${fmtShort(val)}</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x0-86},${(y0+y1)/2}) rotate(-90)" text-anchor="middle">${cfg.yLabel}</text>`;
+  s+=`<text class="axis-label" x="${(x0+x1)/2}" y="${y0+58}" text-anchor="middle">${cfg.xLabel}</text>`;
+  /* right axis (line) */
+  s += `<line class="axis-line" x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  for(let i=0;i<=ticks;i++){
+    const val=minLine+(maxLine-minLine)*i/ticks, y=y0-(y0-y1)*i/ticks;
+    s+=`<line class="axis-tick" x1="${x1}" y1="${y}" x2="${x1+7}" y2="${y}"/>`;
+    s+=`<text class="tick-label" x="${x1+12}" y="${y+5}" text-anchor="start">${val.toFixed(1)}%</text>`;
+  }
+  s+=`<text class="axis-label" transform="translate(${x1+88},${(y0+y1)/2}) rotate(90)" text-anchor="middle" fill="var(--thread-turmeric)">${cfg.lineLabel}</text>`;
+  /* x ticks */
+  labels.forEach((l,i)=>{
+    const x = xAt(i);
+    s+=`<line class="axis-tick" x1="${x}" y1="${y0}" x2="${x}" y2="${y0+7}"/>`;
+    s+=`<text class="tick-label" x="${x}" y="${y0+26}" text-anchor="middle">${l}</text>`;
+  });
+  /* bars + value labels (light-halo behind dark maroon text so it never sits dark-on-dark) */
+  barVals.forEach((v,i)=>{
+    const cx=xAt(i), y=yBarFor(v);
+    s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+    s+=`<text class="value-label" x="${cx}" y="${y-14}" text-anchor="middle" fill="var(--maroon)" style="${HALO}">${v}</text>`;
+  });
+  /* line + value labels - anchor shifts inward at the two edges so labels
+     never overlap the y-axis tick column or spill past the right edge */
+  let lpath="";
+  lineVals.forEach((v,i)=>{ const x=xAt(i), y=yLineFor(v); lpath+=(i===0?"M":"L")+x+","+y+" "; });
+  s+=`<path d="${lpath}" fill="none" stroke="var(--thread-turmeric)" stroke-width="3.6"/>`;
+  lineVals.forEach((v,i)=>{
+    const x=xAt(i), y=yLineFor(v);
+    const anchor = i===0 ? "start" : (i===lineVals.length-1 ? "end" : "middle");
+    const lx = i===0 ? x+10 : (i===lineVals.length-1 ? x-10 : x);
+    s+=`<circle cx="${x}" cy="${y}" r="5.5" fill="var(--thread-turmeric)" stroke="var(--paper)" stroke-width="1.8"/>`;
+    s+=`<text class="value-label" x="${lx}" y="${y-16}" text-anchor="${anchor}" fill="var(--thread-turmeric)" style="${HALO}">${v.toFixed(1)}%</text>`;
+  });
+  /* legend */
+  let lx=x0+20, ly=y1+16;
+  s+=`<rect x="${lx}" y="${ly-10}" width="16" height="16" fill="var(--maroon)" rx="2" opacity="0.85"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+3}">GVO (Rs lakh cr)</text>`;
+  s+=`<circle cx="${lx+8}" cy="${ly+26}" r="6" fill="var(--thread-turmeric)"/>`;
+  s+=`<text class="legend-label" x="${lx+24}" y="${ly+30}">${cfg.lineLabel} (right axis)</text>`;
+  s+="</svg></div>";
+  return s;
+}
+
+function barChart(cfg){
+  const w=1000,h=440, x0=92,y1=40,y0=h-70,x1=w-40;
+  let maxVal = niceMax(Math.max(...cfg.values)*1.15);
+  const labels = cfg.labels;
+  const bw = (x1-x0)/labels.length*0.6;
+  const step = (x1-x0)/labels.length;
+  const yFor = v => y0 - (y0-y1)*(v/maxVal);
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += svgAxes(x0,y0,x1,y1,maxVal,0,cfg.xLabel,cfg.yLabel,cfg.title,w,h);
+  cfg.values.forEach((v,i)=>{
+    const cx = x0 + step*i + step/2;
+    const y = yFor(v);
+    s += `<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${y0-y}" fill="var(--maroon)" rx="2"/>`;
+    s += `<line class="axis-tick" x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0+7}"/>`;
+    s += `<text class="tick-label" x="${cx}" y="${y0+24}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  s+="</svg></div>";
+  return s;
+}
+
+function pieChart(cfg){
+  const w=1000,h=460, cx=300, cy=230, r=160;
+  const total = cfg.values.reduce((a,b)=>a+b, 0);
+  const palette = ["var(--thread-indigo)","var(--thread-madder)","var(--thread-teal)","var(--thread-turmeric)"];
+  let s = `<div class="chart-frame"><svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px">`;
+  s += `<text class="chart-title" x="20" y="28">${cfg.title}</text>`;
+  let angle = -90;
+  cfg.values.forEach((v,i)=>{
+    const pct = v/total;
+    const sweep = pct*360;
+    const a1 = (angle)*Math.PI/180;
+    const a2 = (angle+sweep)*Math.PI/180;
+    const x1 = cx + r*Math.cos(a1), y1 = cy + r*Math.sin(a1);
+    const x2 = cx + r*Math.cos(a2), y2 = cy + r*Math.sin(a2);
+    const large = sweep > 180 ? 1 : 0;
+    s += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${palette[i%palette.length]}" opacity="0.85" stroke="var(--card)" stroke-width="2"/>`;
+    const midA = (angle+sweep/2)*Math.PI/180;
+    const lx = cx + (r*0.62)*Math.cos(midA), ly = cy + (r*0.62)*Math.sin(midA);
+    const pctStr = (pct*100).toFixed(1) + "%";
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" style="font-family:var(--mono);font-size:15px;font-weight:600;fill:var(--card);">${pctStr}</text>`;
+    angle += sweep;
+  });
+  let ly = 60;
+  cfg.labels.forEach((l,i)=>{
+    const v = cfg.values[i];
+    const pct = (v/total*100).toFixed(1);
+    s += `<rect x="560" y="${ly-12}" width="16" height="16" fill="${palette[i%palette.length]}" rx="2"/>`;
+    s += `<text class="legend-label" x="584" y="${ly}" dominant-baseline="central">${l}</text>`;
+    s += `<text class="tick-label" x="960" y="${ly}" text-anchor="end" dominant-baseline="central" style="font-weight:600;">${pct}%</text>`;
+    ly += 38;
+  });
+  s += `</svg></div>`;
+  return s;
+}
+
+function isNumericCell(v){
+  const s = String(v==null?"":v).trim();
+  if(s==="" || s==="—" || s==="-" || /^n\/a$/i.test(s)) return true;
+  return /^[₹#~\-−+]?[\d]/.test(s);
+}
+function table(cfg){
+  // A column only gets the numeric (mono, right-aligned) treatment if every
+  // cell in it actually looks like a number/currency value — otherwise it's
+  // treated as ordinary text (readable body font, left-aligned, free to wrap).
+  const numCol = cfg.cols.map((c,i)=> i>0 && cfg.rows.every(r=>isNumericCell(r[i])) );
+  let s = `<div class="table-scroll"><p class="block-note">${cfg.note}</p><table><thead><tr>`;
+  cfg.cols.forEach((c,i)=>{ s+=`<th class="${numCol[i]?'num':''}">${c}</th>`; });
+  s+="</tr></thead><tbody>";
+  cfg.rows.forEach(r=>{ s+="<tr>"+r.map((c,i)=>`<td class="${numCol[i]?'num':''}">${c}</td>`).join("")+"</tr>"; });
+  s+="</tbody></table></div>";
+  return s;
+}
+
+/* =====================================================================
+   BUILD
+   ===================================================================== */
+function polar(angleDeg, rx, ry){
+  const a = angleDeg*Math.PI/180;
+  return {x: Math.cos(a)*rx, y: Math.sin(a)*ry};
+}
+
+function centerHTML(){
+  const c = DATA.center;
+  return `<div class="center-cover">
+      <p class="cc-eyebrow">Food and Agro Sector Snapshot</p>
+      <h1 class="cc-title">${c.title}</h1>
+      <button class="cc-cta" onclick="zoomTo('center')">
+        Start Here →
+      </button>
+    </div>
+    <div class="preview">
+    <h1>${c.title}</h1>
+    <p class="tagline">${c.tagline}</p>
+    <div class="stat-row">${c.stats.map((s,i)=>`<div class="stat"><span class="n" data-final="${s.n}">${s.n}</span><span class="l">${s.l}</span></div>`).join("")}</div>
+    <button class="cta-btn" onclick="goNext()">Explore the sector →</button>
+  </div>`;
+}
+
+function satelliteDetail(key){
+  const d = DATA[key];
+  if(key==="scale") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2" style="align-items:start;gap:44px"><div style="align-self:start">${table(d.scaleTable)}</div><div>${barLineChart(d.gvoGvaChart)}<p class="block-note">${d.gvoGvaChart.caption}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.factoryChart)}</div>
+      <div>${lineChart(d.hhiChart)}<p class="block-note">${d.hhiChart.band}</p></div></div>
+    <div class="grid2"><div>${lineChart(d.capIntensityChart)}<p class="block-note">${d.capIntensityChart.band}</p></div>
+      <div>${barChart(d.costStructureChart)}<p class="block-note">${d.costStructureChart.caption}</p></div></div>
+    <div class="grid1"><p class="block-title">Top firms, ranked</p>${table(d.firmTable)}
+      <div class="flag" style="margin-top:18px">${d.firmConcNote}</div></div>
+    <div class="grid2">
+      <div><p class="block-title">R&D spend leaders (by value)</p>${table(d.rndByValueTable)}<p class="block-note" style="margin-top:12px">${d.rndByValueNote}</p></div>
+      <div><p class="block-title">R&D intensity leaders (by % of sales)</p>${table(d.rndLeadersTable)}<p class="block-note" style="margin-top:12px">${d.rndLeadersNote}</p></div>
+    </div>
+    <div class="grid2">
+      <div><p class="block-title">Export leaders (by value)</p>${table(d.exportByValueTable)}<p class="block-note" style="margin-top:12px">${d.exportByValueNote}</p></div>
+      <div><p class="block-title">Export intensity leaders (by % of sales)</p>${table(d.exportLeadersTable)}<p class="block-note" style="margin-top:12px">${d.exportLeadersNote}</p></div>
+    </div>
+    <div class="grid1"><p class="block-title">Firm-level churn, FY2014-15 to present</p><p class="block-note-wide">${d.churnNote}</p></div>
+    </div>`;
+
+  if(key==="performance") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid1">${lineChart(d.iipChart)}</div>
+    <div class="grid2"><div>${lineChart(d.marginChart)}</div>
+      <div><p class="block-title">Returns, leverage & liquidity</p>${table(d.returnsTable)}
+      <p class="block-note" style="margin-top:12px">${d.fcfNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">ASI labour & productivity</p>${table(d.asiTable)}</div>
+      <div><p class="block-title">R&D intensity</p><div class="rnd-callout"><div class="rnd-num">0.083%</div><div class="rnd-label">of sales — R&D spend, 2024-25</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">Laggard &lt;1%</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div><p class="rnd-note">${d.rndFlag}</p></div></div></div>
+    <div class="grid1"><p class="block-title">The story behind the numbers</p><div class="narrative">${d.narrative}</div></div>
+    </div>`;
+
+  if(key==="trade") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.tradeChart)}</div>
+      <div><div class="trade-kpi-grid">${d.stats.map(s=>`<div class="trade-kpi"><span class="trade-kpi-n">${s.n}</span><span class="trade-kpi-l">${s.l}</span></div>`).join("")}</div>
+      <div style="margin-top:26px">${table(d.partnersTable)}</div></div></div>
+    <div class="grid1">${table(d.productsTable)}</div>
+    <div class="flag">${d.caveatNote}</div>
+    </div>`;
+
+  if(key==="investment") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${lineChart(d.pipelineChart)}<div class="flag">${d.dropFlag}</div></div>
+      <div>${pieChart(d.ownershipChart)}<p class="block-note">${d.ownershipNote}</p></div></div>
+    <div class="grid2"><div><p class="block-title">Detailed pipeline breakdown</p>${table(d.pipelineTable)}</div>
+      <div><p class="block-title">Top-3-GVO-state pipeline</p>${table(d.stateTable)}</div></div>
+    <div class="grid2"><div><p class="block-title">PLI scheme</p><p class="narrative" style="font-size:18px">${d.pliNote}</p></div>
+      <div><p class="block-title">FDI</p><p class="narrative" style="font-size:18px">${d.fdiNote}</p></div></div>
+    <div class="rnd-callout" style="margin-top:8px"><div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap"><div class="rnd-num">${d.rndHighlight.pct}</div><div><div class="rnd-label">${d.rndHighlight.label}</div><div class="rnd-bands"><span class="rnd-band rnd-laggard active">${d.rndHighlight.band}</span><span class="rnd-band rnd-active">Active 1–3%</span><span class="rnd-band rnd-leader">Leader &gt;3%</span></div></div></div><p class="rnd-note" style="margin-top:14px">${d.rndHighlight.note}</p></div>
+    <div class="insight-box"><div class="label">Observation</div><p>${d.insightBox}</p></div>
+    </div>`;
+
+  if(key==="geography") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <div class="grid2"><div>${barChart(d.gvoAbsChart)}</div><div>${barChart(d.gvoChart)}</div></div>
+    <div class="grid1">${barChart(d.wageChart)}</div>
+    <div class="grid1">${table(d.stateTable)}</div>
+    <div class="flag">${d.flag}</div>
+    </div>`;
+
+  if(key==="clusters") return `<div class="detail">
+    <p class="theme-label">${d.eyebrow}</p><h2>${d.title}</h2><p class="subhead">${d.subhead}</p>
+    <p class="block-title">Registered clusters</p>
+    <div class="chip-row">${d.clusterChips.map(c=>`<div class="chip">${c}</div>`).join("")}</div>
+    <div class="grid1" style="margin-top:30px">${table(d.clusterTable)}</div>
+    <div class="flag" style="margin-top:20px">${d.note}</div>
+    <p class="block-note" style="margin-top:16px"><b>Note (d):</b> ${d.noteD}</p>
+    <p class="block-note" style="margin-top:8px"><b>Note (e):</b> ${d.noteE}</p>
+    </div>`;
+}
+
+function detailNav(key){
+  const idx = ORDER.indexOf(key);
+  const prevLabel = idx>0 ? DATA[ORDER[idx-1]].eyebrow.split(" — ")[1] : "Overview";
+  const isLast = idx === ORDER.length-1;
+  const nextLabel = isLast ? "Read the Sector Story ↓" : DATA[ORDER[idx+1]].eyebrow.split(" — ")[1] + " →";
+  return `<div class="detail-nav">
+    <button class="nav-btn" onclick="goPrev()">← ${prevLabel}</button>
+    <button class="nav-btn primary" onclick="goNext()">${nextLabel}</button>
+  </div>`;
+}
+
+function satelliteWrapper(key){
+  const d = DATA[key];
+  const [num, label] = d.eyebrow.split(" — ");
+  return `<div class="cover" style="--accent:${ACCENTS[key]}">
+      <span class="cover-num">${num}</span>
+      <h2 class="cover-label">${label}</h2>
+      <span class="cover-arrow">→</span>
+    </div>
+    <div class="detail-wrap">${satelliteDetail(key)}${detailNav(key)}</div>`;
+}
+
+function build(){
+  const world = document.getElementById("world");
+
+  layout.center = {x:-CENTER_W/2, y:-CENTER_H/2, w:CENTER_W, h:CENTER_H, cx:0, cy:0};
+  const centerEl = document.createElement("div");
+  centerEl.className = "node center";
+  centerEl.style.cssText = `left:${layout.center.x}px;top:${layout.center.y}px;width:${CENTER_W}px;height:${CENTER_H}px;`;
+  centerEl.innerHTML = centerHTML() + `<div class="node-hit" onclick="zoomTo('center')"></div>`;
+  world.appendChild(centerEl);
+
+  ORDER.forEach(key=>{
+    const p = polar(ANGLES[key], RADIUS_X, RADIUS_Y);
+    const cx = p.x, cy = p.y;
+    layout[key] = {x:cx-NODE_W/2, y:cy-NODE_H/2, w:NODE_W, h:NODE_H, cx, cy};
+    const el = document.createElement("div");
+    el.className = "node";
+    el.id = "node-"+key;
+    el.style.cssText = `left:${layout[key].x}px;top:${layout[key].y}px;width:${NODE_W}px;height:${NODE_H}px;`;
+    el.innerHTML = satelliteWrapper(key) + `<div class="node-hit" data-key="${key}"></div>`;
+    world.appendChild(el);
+  });
+
+  const svg = document.getElementById("threads");
+  const allX = Object.values(layout).map(l=>l.cx), allY = Object.values(layout).map(l=>l.cy);
+  const pad = 400;
+  const minX = Math.min(...allX)-pad, minY = Math.min(...allY)-pad;
+  const maxX = Math.max(...allX)+pad, maxY = Math.max(...allY)+pad;
+  svg.setAttribute("width", maxX-minX);
+  svg.setAttribute("height", maxY-minY);
+  svg.style.left = minX+"px"; svg.style.top = minY+"px";
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX-minX} ${maxY-minY}`);
+  let lines="";
+  ORDER.forEach(key=>{
+    const l = layout[key];
+    lines += `<line x1="1" y1="1" x2="${l.cx}" y2="${l.cy}" stroke="${ACCENTS[key]}" stroke-opacity="200" stroke-width="10" stroke-dasharray="16 16" stroke-linecap="rectangle"/><circle cx="${l.cx}" cy="${l.cy}" r="12" fill="${ACCENTS[key]}" opacity="0.18"/><circle cx="0" cy="0" r="0" fill="none"/>`;  
+  });
+  svg.innerHTML = lines;
+
+  world.addEventListener("click", e=>{
+    const hit = e.target.closest(".node-hit");
+    if(!hit) return;
+    if(hit.dataset.key) zoomTo(hit.dataset.key);
+  });
+
+  fitOverview();
+  window.addEventListener("resize", ()=>{ if(current==="overview") fitOverview(); });
+}
+
+function renderStory(){
+  const el = document.getElementById("story-section");
+  el.innerHTML = `
+    <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
+    <div class="story-divider"></div>
+    <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
+    <h2 class="story-title">${STORY_DATA.title}</h2>
+    <p class="story-lede">${STORY_DATA.lede}</p>
+    ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
+    <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
+    <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
+    <div class="story-footer">
+      <h4>References</h4>
+      <ol class="ref-list">${STORY_DATA.references.map(r=>`<li>${r}</li>`).join("")}</ol>
+      <h4>Methodological Notes</h4>
+      <ul class="note-list">${STORY_DATA.notes.map(n=>`<li><span class="tag">${n.tag}</span> ${n.text}</li>`).join("")}</ul>
+      <div class="colophon">${STORY_DATA.colophon}</div>
+    </div>
+  `;
+}
+
+/* =====================================================================
+   COUNT-UP
+   ===================================================================== */
+function formatCountNum(v, decimals, grouped){
+  let s = v.toFixed(decimals);
+  if(grouped){
+    let parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    s = parts.join(".");
+  }
+  return s;
+}
+function animateStatEl(el){
+  const final = el.dataset.final;
+  const m = final.match(/-?[\d,]+\.?\d*/);
+  if(!m){ el.textContent = final; return; }
+  const numStr = m[0];
+  const prefix = final.slice(0, m.index);
+  const suffix = final.slice(m.index + numStr.length);
+  const grouped = numStr.includes(",");
+  const decimals = numStr.includes(".") ? numStr.split(".")[1].length : 0;
+  const finalNum = parseFloat(numStr.replace(/,/g,""));
+  const duration = 900;
+  const start = performance.now();
+  function frame(now){
+    const t = Math.min(1, (now-start)/duration);
+    const eased = 1 - Math.pow(1-t, 3);
+    el.textContent = prefix + formatCountNum(finalNum*eased, decimals, grouped) + suffix;
+    if(t<1) requestAnimationFrame(frame); else el.textContent = final;
+  }
+  requestAnimationFrame(frame);
+}
+function animateCenterStats(){
+  document.querySelectorAll(".node.center .stat .n").forEach((el,i)=>{
+    setTimeout(()=>animateStatEl(el), i*90);
+  });
+}
+
+/* =====================================================================
+   CAMERA
+   ===================================================================== */
+let current = "overview";
+let navIndex = -1;
+
+function applyTransform(cx, cy, scale, animate=true){
+  const world = document.getElementById("world");
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tx = vw/2 - cx*scale;
+  const ty = vh/2 - cy*scale;
+  world.style.transition = animate ? "" : "none";
+  world.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if(!animate) world.offsetHeight;
+  world.style.transition = "";
+}
+
+function fitOverview(){
+  const allX = Object.values(layout).map(l=>[l.x,l.x+l.w]).flat();
+  const allY = Object.values(layout).map(l=>[l.y,l.y+l.h]).flat();
+  const minX=Math.min(...allX), maxX=Math.max(...allX);
+  const minY=Math.min(...allY), maxY=Math.max(...allY);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const margin = 1.15;
+  const scale = Math.min(window.innerWidth/((maxX-minX)*margin), window.innerHeight/((maxY-minY)*margin));
+  overviewScale = scale; overviewCenter = {cx,cy};
+  applyTransform(cx,cy,scale, current!=="overview");
+}
+let overviewScale=1, overviewCenter={cx:0,cy:0};
+
+function setActive(key){
+  document.querySelectorAll(".node").forEach(n=>n.classList.remove("active"));
+  if(!key) return;
+  const el = key==="center" ? document.querySelector(".node.center") : document.getElementById("node-"+key);
+  if(el) el.classList.add("active");
+}
+
+function updateHud(key){
+  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
+  const crumb = document.getElementById("breadcrumb");
+  const bottomBar = document.getElementById("bottom-bar");
+  if(key==="overview"){
+    home.classList.add("hidden"); start.classList.remove("hidden");
+    prev.classList.add("hidden"); next.classList.add("hidden");
+    crumb.textContent = "Food and Agro Sector Snapshot";
+    bottomBar.classList.remove("hidden");
+    return;
+  }
+  bottomBar.classList.add("hidden");
+  home.classList.remove("hidden"); start.classList.add("hidden");
+  prev.classList.remove("hidden"); next.classList.remove("hidden");
+  if(key==="center"){
+    crumb.innerHTML = "<b>Overview</b>";
+  } else {
+    const orderIdx = ORDER.indexOf(key)+1;
+    const shortLabel = DATA[key].eyebrow.split(" — ")[1];
+    crumb.innerHTML = `<b>${shortLabel} · ${orderIdx} of ${ORDER.length}</b>`;
+  }
+}
+
+function currentTransform(){
+  const m = new DOMMatrixReadOnly(getComputedStyle(document.getElementById("world")).transform);
+  return {x:m.e, y:m.f, scale:m.a};
+}
+function zoomByButton(factor){
+  const t = currentTransform();
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const wx=(vw/2 - t.x)/t.scale, wy=(vh/2 - t.y)/t.scale;
+  const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+  applyTransform(wx, wy, ns, true);
+  updateZoomLevel(ns);
+}
+function zoomReset(){
+  if(current==="overview"){ fitOverview(); }
+  else { zoomTo(current); }
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+function updateZoomLevel(s){
+  const el=document.getElementById("zoom-level");
+  if(el) el.textContent=Math.round(s*100)+"%";
+}
+function updateZoomLevelFromTransform(){ updateZoomLevel(currentTransform().scale); }
+
+function zoomTo(key){
+  const l = layout[key];
+  const targetScale = Math.min(window.innerWidth/(l.w*1.08), window.innerHeight/(l.h*1.08), 1.15);
+  applyTransform(l.cx, l.cy, targetScale, true);
+  current = key;
+  navIndex = NAV_ORDER.indexOf(key);
+  setActive(key);
+  updateHud(key);
+  if(key==="center") animateCenterStats();
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function zoomToOverview(){
+  applyTransform(overviewCenter.cx, overviewCenter.cy, overviewScale, true);
+  current = "overview";
+  navIndex = -1;
+  setActive(null);
+  updateHud("overview");
+  setTimeout(updateZoomLevelFromTransform, 920);
+}
+
+function goNext(){
+  if(navIndex >= NAV_ORDER.length-1){ zoomToOverview(); scrollToStory(); return; }
+  zoomTo(NAV_ORDER[navIndex+1]);
+}
+function goPrev(){
+  if(navIndex<=0){ zoomToOverview(); return; }
+  zoomTo(NAV_ORDER[navIndex-1]);
+}
+function scrollToStory(){
+  document.getElementById("story-section").scrollIntoView({behavior:"smooth"});
+}
+
+window.addEventListener("keydown", e=>{
+  if(document.activeElement && ["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowRight") goNext();
+  else if(e.key==="ArrowLeft") goPrev();
+  else if(e.key==="Escape") zoomToOverview();
+});
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("hud").classList.toggle("faded", past);
+  document.getElementById("bottom-bar").classList.toggle("faded", past);
+});
+
+(function enablePanZoom(){
+  const stage = document.getElementById("stage");
+  const world = document.getElementById("world");
+  let dragging=false, sx=0, sy=0, startTransform=null;
+
+  stage.addEventListener("mousedown", e=>{
+    if(e.target.closest(".node-hit")) return;
+    dragging=true; stage.classList.add("dragging");
+    sx=e.clientX; sy=e.clientY;
+    const m = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    startTransform = {x:m.e, y:m.f, scale:m.a};
+    world.style.transition="none";
+  });
+  window.addEventListener("mousemove", e=>{
+    if(!dragging) return;
+    const dx=e.clientX-sx, dy=e.clientY-sy;
+    world.style.transform = `translate(${startTransform.x+dx}px,${startTransform.y+dy}px) scale(${startTransform.scale})`;
+  });
+  window.addEventListener("mouseup", ()=>{
+    if(!dragging) return;
+    dragging=false; stage.classList.remove("dragging");
+    world.style.transition="";
+  });
+
+  stage.addEventListener("wheel", e=>{
+    if(!(e.ctrlKey||e.metaKey)) return;
+    e.preventDefault();
+    const t=currentTransform();
+    const rect=stage.getBoundingClientRect();
+    const px=e.clientX-rect.left, py=e.clientY-rect.top;
+    const wx=(px-t.x)/t.scale, wy=(py-t.y)/t.scale;
+    const factor=Math.exp(-e.deltaY*0.0015);
+    const ns=Math.max(0.12, Math.min(t.scale*factor, 3.2));
+    world.style.transition="none";
+    applyTransform(wx, wy, ns, false);
+    updateZoomLevel(ns);
+  }, {passive:false});
+})();
+
+window.addEventListener("scroll", ()=>{
+  const past = window.scrollY > window.innerHeight*0.4;
+  document.getElementById("zoom-rail").classList.toggle("faded", past);
+});
+
+build();
+renderStory();
+</script>
+</body>
+</html>
