@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Manufacturing Competitiveness Report — Sector Snapshots</title>
+<title>Sector Snapshots — India Manufacturing Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700;9..144,900&family=Fraunces:ital,opsz,wght@1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -42,15 +42,25 @@
   .dateline .mid{color:var(--red);}
 
   header{padding:40px 0 0;text-align:center;border-bottom:3px solid var(--rule);}
+  .logo-slot{
+    width:120px;height:64px;margin:0 auto 18px;
+    border:1px solid var(--ink-32);border-radius:2px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--body);font-size:9px;font-weight:600;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ink-32);text-align:center;line-height:1.3;
+  }
+  .logo-slot img{width:100%;height:100%;object-fit:contain;}
   .masthead{
     font-family:var(--display);font-weight:800;font-size:clamp(40px,7vw,88px);
     line-height:0.98;letter-spacing:-0.01em;margin:0 0 6px;color:var(--ink);
   }
   .masthead .thin{font-weight:300;}
   .kicker{
-    font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.14em;
-    text-transform:uppercase;color:var(--ink-50);margin:0 0 26px;
+    font-family:var(--display-italic);font-style:italic;font-weight:500;font-size:16px;
+    letter-spacing:.03em;color:var(--ink-70);margin:14px 0 28px;
+    display:flex;align-items:center;justify-content:center;gap:16px;
   }
+  .kicker::before,.kicker::after{content:"";width:56px;height:1px;background:var(--ink-32);}
   .subbar{
     background:var(--ink);color:var(--paper);
     font-family:var(--body);font-weight:600;font-size:14px;letter-spacing:.08em;
@@ -135,9 +145,14 @@
     font-family:var(--body);font-size:14px;line-height:1.6;color:rgba(242,237,225,0.86);
     margin:0;
   }
+  .face-back .foot{margin-top:16px;}
+  .face-back .byline{
+    font-family:var(--body);font-weight:500;font-size:11.5px;letter-spacing:.04em;
+    color:rgba(242,237,225,0.5);margin:0 0 6px;
+  }
   .face-back .go{
-    font-family:var(--display);font-weight:600;font-size:16px;color:var(--paper);
-    display:inline-flex;align-items:center;gap:8px;margin-top:16px;
+    font-family:var(--display);font-weight:600;font-size:17px;color:var(--paper);
+    display:inline-flex;align-items:center;gap:8px;
   }
   .face-back .go::after{content:"→";transition:transform 160ms ease;}
   .card-flip:hover .face-back .go::after{transform:translateX(5px);}
@@ -153,19 +168,19 @@
 
 <div class="sheet">
   <div class="dateline">
-    <span>Vol. I — No. 01</span>
     <span class="mid">Institute of Manufacturing and Economy</span>
-    <span>Working Paper Series · 2026</span>
+    <span>August 2026</span>
   </div>
 
   <header>
-    <p class="masthead">Manufacturing<br><span class="thin">Competitiveness Report</span></p>
+    <div class="logo-slot">AU<br>Logo</div>
+    <p class="masthead">Sector Snapshots</p>
     <p class="kicker">Ten Sectors, One Decade of Data</p>
   </header>
 
   <p class="subbar">Sector-by-sector snapshots of Indian manufacturing</p>
 
-  <p class="lede"><span class="dropcap">S</span>cale, financial performance, trade, investment, geography and cluster structure — built from Annual Survey of Industries, CMIE Prowess, Index of Industrial Production and DGCI&amp;S trade data. Hover any entry below to read its brief, then open the full snapshot.</p>
+  <p class="lede"><span class="dropcap">I</span>ndia's manufacturing base, sector by sector — scale, financial performance, trade, investment, geography and cluster structure — built from Annual Survey of Industries, CMIE Prowess, Index of Industrial Production and DGCI&amp;S trade data. Hover any entry below to read its brief, then open the full snapshot.</p>
 
   <div class="section-label"><span>Inside This Edition</span></div>
 
@@ -173,21 +188,21 @@
 </div>
 
 <footer>
-  <div class="colophon">Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · Compiled by: Riddhi Bhargava</div>
+  <div class="colophon">Institute of Manufacturing and Economy · Sector Snapshots · August 2026 · Compiled by: Riddhi Bhargava</div>
 </footer>
 
 <script>
 const SECTORS = [
-  { name:"Textiles", teaser:"India's largest employer of factory labour in manufacturing.", desc:"India's largest employer of factory labour in manufacturing — growing in scale, losing relative ground on output.", href:"textiles.html" },
-  { name:"Transport Equipment", teaser:"The fastest-growing large sector on the official output index.", desc:"The fastest-growing large manufacturing sector on the official output index, with steadily strengthening firm financials.", href:"transport_equipment.html" },
-  { name:"Food and Agro", teaser:"The country's largest factory base by count.", desc:"Agro-processing and packaged food manufacturing — the highest factory count of any sector, with output outrunning value capture.", href:"food-and-agro.html" },
-  { name:"Chemicals", teaser:"Industrial and specialty chemicals, pharma included.", desc:"Industrial and specialty chemicals manufacturing, now including pharmaceuticals within the sector definition.", href:"chemicals.html" },
-  { name:"Electronics", teaser:"Consumer and industrial electronics manufacturing.", desc:"Consumer and industrial electronics manufacturing, a sector defined by import dependence and assembly-led growth.", href:"electronics.html" },
-  { name:"Electrical Equipment", teaser:"Power equipment, motors and electrical machinery.", desc:"Power equipment, motors, and electrical machinery — a capital-goods backbone sector for the wider economy.", href:"electrical_equipment.html" },
-  { name:"Engineering Goods", teaser:"Capital goods, machinery and engineering exports.", desc:"Capital goods, machinery, and engineering exports, spanning a wide and diversified base of intermediate manufacturers.", href:"engineering_goods.html" },
-  { name:"Metals", teaser:"Ferrous and non-ferrous production and processing.", desc:"Ferrous and non-ferrous metal production and processing, a commodity-cyclical sector with heavy capital intensity.", href:"metals.html" },
-  { name:"Construction Materials", teaser:"Cement, ceramics, glass and building materials.", desc:"Cement, ceramics, glass and building materials manufacturing, tracking closely with the domestic construction cycle.", href:"construction_materials.html" },
-  { name:"Leather and Related Products", teaser:"Leather goods, footwear and allied manufacturing.", desc:"Leather goods, footwear and allied manufacturing — a labour-intensive, export-oriented sector under sustained pressure.", href:"leather.html" }
+  { name:"Textiles", researcher:"Dhairya Shah", teaser:"India's largest employer of factory labour in manufacturing.", desc:"India's largest employer of factory labour in manufacturing — growing in scale, losing relative ground on output.", href:"textiles.html" },
+  { name:"Transport Equipment", researcher:"Nidhi Patel", teaser:"The fastest-growing large sector on the official output index.", desc:"The fastest-growing large manufacturing sector on the official output index, with steadily strengthening firm financials.", href:"transport_equipment.html" },
+  { name:"Food and Agro", researcher:"Anurag Kumar", teaser:"The country's largest factory base by count.", desc:"Agro-processing and packaged food manufacturing — the highest factory count of any sector, with output outrunning value capture.", href:"food-and-agro.html" },
+  { name:"Chemicals", researcher:"Netra Vasoya", teaser:"Industrial and specialty chemicals, pharma included.", desc:"Industrial and specialty chemicals manufacturing, now including pharmaceuticals within the sector definition.", href:"chemicals.html" },
+  { name:"Electronics", researcher:"Harsh Dalal", teaser:"Consumer and industrial electronics manufacturing.", desc:"Consumer and industrial electronics manufacturing, a sector defined by import dependence and assembly-led growth.", href:"electronics.html" },
+  { name:"Electrical Equipment", researcher:"Kahaan Shah", teaser:"Power equipment, motors and electrical machinery.", desc:"Power equipment, motors, and electrical machinery — a capital-goods backbone sector for the wider economy.", href:"electrical_equipment.html" },
+  { name:"Engineering Goods", researcher:"Madhav Rathi", teaser:"Capital goods, machinery and engineering exports.", desc:"Capital goods, machinery, and engineering exports, spanning a wide and diversified base of intermediate manufacturers.", href:"engineering_goods.html" },
+  { name:"Metals", researcher:"Aahana Gattani", teaser:"Ferrous and non-ferrous production and processing.", desc:"Ferrous and non-ferrous metal production and processing, a commodity-cyclical sector with heavy capital intensity.", href:"metals.html" },
+  { name:"Construction Materials", researcher:"Riddhi Bhargava", teaser:"Cement, ceramics, glass and building materials.", desc:"Cement, ceramics, glass and building materials manufacturing, tracking closely with the domestic construction cycle.", href:"construction_materials.html" },
+  { name:"Leather and Related Products", researcher:"Riddhi Bhargava", teaser:"Leather goods, footwear and allied manufacturing.", desc:"Leather goods, footwear and allied manufacturing — a labour-intensive, export-oriented sector under sustained pressure.", href:"leather.html" }
 ];
 
 function cardHTML(s, i){
@@ -207,7 +222,10 @@ function cardHTML(s, i){
             <p class="tag">Sector ${num} of 10</p>
             <p>${s.desc}</p>
           </div>
-          <span class="go">Open snapshot</span>
+          <div class="foot">
+            <p class="byline">Research: ${s.researcher}</p>
+            <span class="go">Open snapshot</span>
+          </div>
         </div>
       </div>
     </a>

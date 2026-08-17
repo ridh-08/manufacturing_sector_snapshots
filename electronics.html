@@ -82,7 +82,7 @@
     color:var(--card);font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:.01em;padding:24px 56px;
     border-radius:2px;animation:badge-pulse 2.2s ease-in-out infinite;
     box-shadow:0 0 0 1px rgba(24,22,17,0.12);}
-  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}}
+  @keyframes badge-pulse{0%,100%{opacity:1;transform:translateY(0);}50%{opacity:.8;transform:translateY(-6px);}
   .node.center.active .center-cover{opacity:0;pointer-events:none;}
 
   /* central node content */
@@ -195,7 +195,7 @@
      HUD — controls (fixed over the stage, fades once you scroll
      past it into the Sector Story)
      ============================================================ */
-  #hud{position:fixed;top:26px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
+  #hud{position:fixed;top:62px;left:32px;right:32px;z-index:50;display:flex;align-items:center;
     justify-content:space-between;gap:16px;font-family:var(--mono);transition:opacity 300ms ease;}
   #hud-left{display:flex;align-items:center;gap:16px;min-width:0;}
   #hud-right{display:flex;align-items:center;gap:10px;}
@@ -218,7 +218,20 @@
     font-family:var(--mono);font-size:13px;letter-spacing:.03em;cursor:pointer;color:var(--ink);
     box-shadow:0 10px 24px -12px rgba(32,34,31,0.4);}
   #scroll-cta:hover{border-color:var(--line-strong);}
-  .faded{opacity:0;pointer-events:none;}
+    .faded{opacity:0;pointer-events:none;}
+
+  /* ============================================================
+     TOP STRIP — static dateline-style bar above the stage, in
+     normal document flow (scrolls away, not fixed). Carries the
+     sector name and byline, newspaper masthead style.
+     ============================================================ */
+  #top-strip{background:var(--paper);border-bottom:1px solid var(--rule-soft,var(--line-strong));
+    padding:20px 32px;display:flex;align-items:baseline;justify-content:flex-start;gap:22px;flex-wrap:wrap;
+    font-family:var(--mono);}
+  #top-strip .ts-name{font-size:19px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);
+    font-family:var(--display);}
+  #top-strip .ts-byline{font-size:14px;letter-spacing:.03em;text-transform:uppercase;opacity:.62;}
+  #top-strip .ts-byline b{opacity:1;font-weight:600;color:var(--maroon);}
 
   /* ============================================================
      ZOOM RAIL — fixed + / − controls on the right edge of the stage.
@@ -241,20 +254,43 @@
      to be read by anyone regardless of whether they click through
      the mindmap.
      ============================================================ */
-  #story-section{max-width:740px;margin:0 auto;padding:120px 24px 160px;}
-  .back-to-top{display:inline-block;margin-bottom:56px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
+  #story-section{max-width:760px;margin:0 auto;padding:110px 24px 160px;}
+    .back-to-top{display:inline-block;margin-bottom:44px;font-family:var(--mono);font-size:13px;letter-spacing:.04em;
     opacity:.5;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line-soft);padding-bottom:2px;}
   .back-to-top:hover{opacity:1;}
-  .story-divider{max-width:120px;margin:0 auto 40px;border-top:2px dashed var(--line-hard);}
-  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:15px;opacity:.55;
-    text-align:center;margin:0 0 12px;}
-  .story-title{font-family:var(--display);font-weight:600;font-size:clamp(34px,5vw,54px);text-align:center;
-    margin:0 0 22px;line-height:1.12;}
-  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:center;opacity:.72;
-    max-width:600px;margin:0 auto 72px;}
-  .story-block{margin-bottom:50px;}
-  .story-block h3{font-family:var(--display);font-size:26px;font-weight:600;margin:0 0 14px;color:var(--thread-indigo);}
-  .story-block p{font-family:var(--display);font-size:19px;line-height:1.78;margin:0 0 16px;color:var(--ink);}
+  .story-divider{display:none;}
+
+  /* ---- masthead-style article header ---- */
+  .story-dateline{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+    font-family:var(--body);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink);opacity:.6;padding-bottom:12px;border-bottom:1px solid var(--ink);margin-bottom:26px;}
+  .story-dateline .mid{color:var(--maroon);opacity:1;}
+
+  .story-eyebrow{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:13px;opacity:.55;
+    text-align:center;margin:0 0 14px;}
+  .story-title{font-family:var(--display);font-weight:800;font-size:clamp(32px,5.4vw,58px);text-align:center;
+    margin:0 0 20px;line-height:1.05;letter-spacing:-0.01em;}
+  .story-byline{text-align:center;font-family:var(--body);font-size:13px;font-weight:600;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--ink);opacity:.7;margin:0 0 6px;}
+  .story-byline b{color:var(--maroon);opacity:1;}
+  .story-dek{text-align:center;font-family:var(--body);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
+    opacity:.45;margin:0 0 40px;}
+  .story-rule{max-width:100%;border:none;border-top:3px solid var(--ink);margin:0 0 8px;}
+  .story-rule.thin{border-top:1px solid var(--line-strong);margin:0 0 40px;}
+
+  .story-lede{font-family:var(--display);font-size:20px;line-height:1.6;text-align:left;opacity:.85;
+    max-width:680px;margin:0 auto 56px;font-style:italic;}
+  .story-lede .dropcap{float:left;font-family:var(--display);font-weight:700;font-style:normal;font-size:66px;
+    line-height:0.8;padding:5px 10px 0 0;color:var(--ink);}
+
+  .story-block{margin-bottom:44px;}
+  .story-block h3{font-family:var(--body);font-size:20px;font-weight:700;margin:0 0 16px;color:var(--ink);
+    text-transform:uppercase;letter-spacing:.08em;
+    display:flex;align-items:center;gap:12px;}
+  .story-block h3::after{content:"";flex:1;height:1px;background:var(--rule,var(--ink));opacity:.25;}
+  .story-block p{font-family:var(--display);font-size:18px;line-height:1.78;margin:0 0 16px;color:var(--ink);
+    text-align:justify;text-justify:inter-word;}
+  .story-block p:first-of-type::first-letter{font-weight:600;}
   .story-takeaway{margin-top:56px;padding:30px 34px;border-left:3px solid var(--thread-madder);
     background:rgba(163,64,47,.07);border-radius:0 6px 6px 0;font-family:var(--display);font-size:19px;line-height:1.65;}
   .story-takeaway b{color:var(--thread-madder);}
@@ -297,6 +333,7 @@
 
   @media (max-width:720px){
     #hud{flex-direction:column;align-items:flex-start;}
+    #top-strip{flex-direction:column;align-items:flex-start;gap:4px;padding:12px 20px;}
     .detail{padding:48px 30px 8px;}
     .detail .grid2{grid-template-columns:1fr;gap:36px;}
     .detail-nav{padding:20px 30px 32px;}
@@ -307,11 +344,15 @@
 <body>
 <a id="top"></a>
 
+<div id="top-strip">
+  <span class="ts-name">Electronics Sector Snapshot</span>
+  <span class="ts-byline">Primary Research: <b>Harsh Dalal</b> · Compiled by: <b>Riddhi Bhargava</b></span>
+</div>
+
 <div id="hud">
   <div id="hud-left">
     <button id="home-btn" class="hud-btn hidden" onclick="zoomToOverview()">← Bird's-eye view</button>
-    <button id="start-btn" class="hud-btn ghost" onclick="zoomTo('center')">Explore the sector →</button>
-    <div id="breadcrumb">Electronics Sector Snapshot</div>
+    <div id="breadcrumb"></div>
   </div>
   <div id="hud-right">
     <button id="prev-btn" class="hud-btn ghost hidden" onclick="goPrev()">← Prev</button>
@@ -749,7 +790,7 @@ const STORY_DATA = {
     {tag:"(d)", text:"PLI figures in this paper distinguish total multi-year scheme outlay (Ministry / press sources, a policy-design number, externally verified since not present in the CMIE Industry Outlookfor this sector beyond one year) from actual CMIE-reported annual disbursement (an execution number). The only CMIE-sourced disbursement data point available for Electronics is 2022-23: Budget Estimate ₹5,300 crore, Revised Estimate ₹2,203 crore. Other years are a flagged data gap, not estimated."},
     {tag:"(f)", text:"Andhra Pradesh's Electronics GVO series shows very large year-on-year swings (a roughly 109x rise from 2014-15 to a 2018-19 peak, then a partial retreat) on a small factory base (31 factories in 2023-24) — read as evidence of a small number of large plant entries/exits rather than a smooth structural trend."}
   ],
-  colophon: "Institute of Manufacturing and Economy · Manufacturing Sector Working Paper Series · Paper 10 of 11 · NIC Division 26 · Primary research: To be asked · Compiled by: Riddhi Bhargava"
+  colophon: "Institute of Manufacturing and Economy · Sector Snapshots · August 2026 · NIC Division 26 · Primary Research: Harsh Dalal · Compiled by: Riddhi Bhargava"
 };
 
 /* =====================================================================
@@ -1160,10 +1201,17 @@ function renderStory(){
   const el = document.getElementById("story-section");
   el.innerHTML = `
     <a href="#top" class="back-to-top" onclick="event.preventDefault();window.scrollTo({top:0,behavior:'smooth'});">↑ Back to the mindmap</a>
-    <div class="story-divider"></div>
+    <div class="story-dateline">
+      <span>Sector Snapshots</span>
+      <span class="mid">Institute of Manufacturing and Economy</span>
+      <span>August 2026</span>
+    </div>
     <p class="story-eyebrow">${STORY_DATA.eyebrow}</p>
     <h2 class="story-title">${STORY_DATA.title}</h2>
-    <p class="story-lede">${STORY_DATA.lede}</p>
+    <p class="story-byline">By <b>Harsh Dalal</b> &nbsp;·&nbsp; Compiled by <b>Riddhi Bhargava</b></p>
+    <p class="story-dek">Electronics Sector Snapshot</p>
+    <hr class="story-rule"><hr class="story-rule thin">
+    <p class="story-lede"><span class="dropcap">${STORY_DATA.lede.charAt(0)}</span>${STORY_DATA.lede.slice(1)}</p>
     ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
     <div class="summary-grid">${STORY_DATA.summary.map(s=>`<div><span class="num">${s.n}</span><span class="lbl">${s.l}</span></div>`).join("")}</div>
     <div class="story-takeaway"><b>Takeaway —</b> ${STORY_DATA.takeaway}</div>
@@ -1253,19 +1301,19 @@ function setActive(key){
 }
 
 function updateHud(key){
-  const home = document.getElementById("home-btn"), start = document.getElementById("start-btn");
+  const home = document.getElementById("home-btn");
   const prev = document.getElementById("prev-btn"), next = document.getElementById("next-btn");
   const crumb = document.getElementById("breadcrumb");
   const bottomBar = document.getElementById("bottom-bar");
   if(key==="overview"){
-    home.classList.add("hidden"); start.classList.remove("hidden");
+    home.classList.add("hidden");
     prev.classList.add("hidden"); next.classList.add("hidden");
-    crumb.textContent = "Textiles Sector Snapshot";
+    crumb.textContent = "";
     bottomBar.classList.remove("hidden");
     return;
   }
   bottomBar.classList.add("hidden");
-  home.classList.remove("hidden"); start.classList.add("hidden");
+  home.classList.remove("hidden");
   prev.classList.remove("hidden"); next.classList.remove("hidden");
   if(key==="center"){
     crumb.innerHTML = "<b>Overview</b>";
