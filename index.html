@@ -121,6 +121,11 @@
     margin:0 0 12px;color:var(--ink);
   }
   .face-front .rule{height:1px;background:var(--ink-32);margin:0 0 12px;}
+  .face-front .card-nic{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
+  .face-front .card-nic span{
+    font-family:var(--body);font-size:10px;font-weight:700;letter-spacing:.03em;
+    color:var(--ink-50);border:1px solid var(--ink-32);border-radius:12px;padding:2px 9px;
+  }
   .face-front .teaser{
     font-family:var(--display);font-style:italic;font-weight:400;font-size:14.5px;
     line-height:1.5;color:var(--ink-70);margin:0;flex-grow:1;
@@ -190,16 +195,16 @@
 
 <script>
 const SECTORS = [
-  { name:"Textiles", researcher:"Dhairya Shah", teaser:"India's largest employer of factory labour in manufacturing.", desc:"India's largest employer of factory labour in manufacturing — growing in scale, losing relative ground on output.", href:"textiles.html" },
-  { name:"Transport Equipment", researcher:"Nidhi Patel", teaser:"The fastest-growing large sector on the official output index.", desc:"The fastest-growing large manufacturing sector on the official output index, with steadily strengthening firm financials.", href:"transport_equipment.html" },
-  { name:"Food and Agro", researcher:"Anurag Kumar", teaser:"The country's largest factory base by count.", desc:"Agro-processing and packaged food manufacturing — the highest factory count of any sector, with output outrunning value capture.", href:"food-and-agro.html" },
-  { name:"Chemicals", researcher:"Netra Vasoya", teaser:"Industrial and specialty chemicals, pharma included.", desc:"Industrial and specialty chemicals manufacturing, now including pharmaceuticals within the sector definition.", href:"chemicals.html" },
-  { name:"Electronics", researcher:"Harsh Dalal", teaser:"Consumer and industrial electronics manufacturing.", desc:"Consumer and industrial electronics manufacturing, a sector defined by import dependence and assembly-led growth.", href:"electronics.html" },
-  { name:"Electrical Equipment", researcher:"Kahaan Shah", teaser:"Power equipment, motors and electrical machinery.", desc:"Power equipment, motors, and electrical machinery — a capital-goods backbone sector for the wider economy.", href:"electrical_equipment.html" },
-  { name:"Engineering Goods", researcher:"Madhav Rathi", teaser:"Capital goods, machinery and engineering exports.", desc:"Capital goods, machinery, and engineering exports, spanning a wide and diversified base of intermediate manufacturers.", href:"engineering_goods.html" },
-  { name:"Metals", researcher:"Aahana Gattani", teaser:"Ferrous and non-ferrous production and processing.", desc:"Ferrous and non-ferrous metal production and processing, a commodity-cyclical sector with heavy capital intensity.", href:"metals.html" },
-  { name:"Construction Materials", researcher:"Riddhi Bhargava", teaser:"Cement, ceramics, glass and building materials.", desc:"Cement, ceramics, glass and building materials manufacturing, tracking closely with the domestic construction cycle.", href:"construction_materials.html" },
-  { name:"Leather and Related Products", researcher:"Riddhi Bhargava", teaser:"Leather goods, footwear and allied manufacturing.", desc:"Leather goods, footwear and allied manufacturing — a labour-intensive, export-oriented sector under sustained pressure.", href:"leather.html" }
+  { name:"Textiles", nic:["NIC 13","NIC 14"], researcher:"Dhairya Shah", teaser:"India's largest employer of factory labour in manufacturing.", desc:"India's largest employer of factory labour in manufacturing — growing in scale, losing relative ground on output.", href:"textiles.html" },
+  { name:"Transport Equipment", nic:["NIC 29","NIC 30"], researcher:"Nidhi Patel", teaser:"The fastest-growing large sector on the official output index.", desc:"The fastest-growing large manufacturing sector on the official output index, with steadily strengthening firm financials.", href:"transport_equipment.html" },
+  { name:"Food and Agro", nic:["NIC 10","NIC 11","NIC 12"], researcher:"Anurag Kumar", teaser:"The country's largest factory base by count.", desc:"Agro-processing and packaged food manufacturing — the highest factory count of any sector, with output outrunning value capture.", href:"food-and-agro.html" },
+  { name:"Chemicals", nic:["NIC 19","NIC 20","NIC 21","NIC 22"], researcher:"Netra Vasoya", teaser:"Industrial and specialty chemicals, pharma included.", desc:"Industrial and specialty chemicals manufacturing, now including pharmaceuticals within the sector definition.", href:"chemicals.html" },
+  { name:"Electronics", nic:["NIC 26"], researcher:"Harsh Dalal", teaser:"Consumer and industrial electronics manufacturing.", desc:"Consumer and industrial electronics manufacturing, a sector defined by import dependence and assembly-led growth.", href:"electronics.html" },
+  { name:"Electrical Equipment", nic:["NIC 27"], researcher:"Kahaan Shah", teaser:"Power equipment, motors and electrical machinery.", desc:"Power equipment, motors, and electrical machinery — a capital-goods backbone sector for the wider economy.", href:"electrical_equipment.html" },
+  { name:"Engineering Goods", nic:["NIC 28"], researcher:"Madhav Rathi", teaser:"Capital goods, machinery and engineering exports.", desc:"Capital goods, machinery, and engineering exports, spanning a wide and diversified base of intermediate manufacturers.", href:"engineering_goods.html" },
+  { name:"Metals", nic:["NIC 24","NIC 25"], researcher:"Aahana Gattani", teaser:"Ferrous and non-ferrous production and processing.", desc:"Ferrous and non-ferrous metal production and processing, a commodity-cyclical sector with heavy capital intensity.", href:"metals.html" },
+  { name:"Construction Materials", nic:["NIC 16","NIC 23","NIC 31"], researcher:"Riddhi Bhargava", teaser:"Cement, ceramics, glass and building materials.", desc:"Cement, ceramics, glass and building materials manufacturing, tracking closely with the domestic construction cycle.", href:"construction_materials.html" },
+  { name:"Leather and Related Products", nic:["NIC 15"], researcher:"Riddhi Bhargava", teaser:"Leather goods, footwear and allied manufacturing.", desc:"Leather goods, footwear and allied manufacturing — a labour-intensive, export-oriented sector under sustained pressure.", href:"leather.html" }
 ];
 
 function cardHTML(s, i){
@@ -211,6 +216,7 @@ function cardHTML(s, i){
           <p class="tag">Sector ${num} of 10</p>
           <h3>${s.name}</h3>
           <div class="rule"></div>
+          <div class="card-nic">${s.nic.map(c=>`<span>${c}</span>`).join("")}</div>
           <p class="teaser">${s.teaser}</p>
           <p class="cont">Continued inside →</p>
         </div>

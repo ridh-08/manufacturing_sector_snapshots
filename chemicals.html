@@ -274,6 +274,12 @@
   .story-byline b{color:var(--maroon);opacity:1;}
   .story-dek{text-align:center;font-family:var(--body);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
     opacity:.45;margin:0 0 40px;}
+  .story-scope{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin:22px 0 32px;}
+  .nic-pill{font-family:var(--mono);font-size:11px;letter-spacing:.02em;color:var(--ink);opacity:.72;
+    border:1px solid var(--line-strong);border-radius:20px;padding:5px 13px 5px 11px;background:var(--card);
+    white-space:nowrap;cursor:default;transition:opacity 160ms ease,border-color 160ms ease;}
+  .nic-pill:hover{opacity:1;border-color:var(--ink);}
+  .nic-pill b{font-weight:600;color:var(--maroon);margin-right:5px;}
   .story-rule{max-width:100%;border:none;border-top:3px solid var(--ink);margin:0 0 8px;}
   .story-rule.thin{border-top:1px solid var(--line-strong);margin:0 0 40px;}
 
@@ -1211,6 +1217,7 @@ function renderStory(){
     <h2 class="story-title">${STORY_DATA.title}</h2>
     <p class="story-byline">By <b>Netra Vasoya</b> &nbsp;·&nbsp; Compiled by <b>Riddhi Bhargava</b></p>
     <p class="story-dek">Chemicals Sector Snapshot</p>
+    <div class="story-scope"><span class="nic-pill" title="Manufacture of Coke and Refined Petroleum Products"><b>NIC 19</b></span><span class="nic-pill" title="Manufacture of Chemicals and Chemical Products"><b>NIC 20</b></span><span class="nic-pill" title="Manufacture of Pharmaceuticals, Medicinal Chemical and Botanical Products"><b>NIC 21</b></span><span class="nic-pill" title="Manufacture of Rubber and Plastics Products"><b>NIC 22</b></span></div>
     <hr class="story-rule"><hr class="story-rule thin">
     <p class="story-lede"><span class="dropcap">${STORY_DATA.lede.charAt(0)}</span>${STORY_DATA.lede.slice(1)}</p>
     ${STORY_DATA.sections.map(s=>`<div class="story-block"><h3>${s.h}</h3>${s.p.map(p=>`<p>${p}</p>`).join("")}</div>`).join("")}
